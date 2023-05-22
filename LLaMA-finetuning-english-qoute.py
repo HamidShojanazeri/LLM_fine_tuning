@@ -10,6 +10,7 @@ from peft import LoraConfig, get_peft_model
 import transformers
 from datasets import load_dataset
 import fire
+from peft import get_peft_config, get_peft_model, PrefixTuningConfig, TaskType, PeftType, AdaptionPromptConfig
 
 def print_trainable_parameters(model):
     """
@@ -29,13 +30,14 @@ def train(
     model_name: str = "decapoda-research/llama-7b-hf",
     dataset_name: str ="Abirate/english_quotes",
     per_device_train_batch_size: int=4,
-    gradient_accumulation_steps: int=4,
+    gradient_accumulation_steps: int=1,
     warmup_steps: int=100,
-    max_steps: int=200,
+    # max_steps: int=200,
+    num_epochs: int = 4,
     learning_rate: float=2e-4,
     fp16: bool=True,
     logging_steps: int=1,
-    output_dir: str="llama-lora-outputs",  
+    output_dir: str="llama-prefix-outputs-4epcohs-lr2e-4-epoch10",  
 ):
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
@@ -54,10 +56,10 @@ def train(
         )
     model = prepare_model_for_int8_training(model)
 
-    config = LoraConfig(
-        r=16, lora_alpha=32, target_modules=["q_proj", "v_proj"], lora_dropout=0.05, bias="none", task_type="CAUSAL_LM"
-    )
-
+    # config = LoraConfig(
+    #     r=16, lora_alpha=32, target_modules=["q_proj", "v_proj"], lora_dropout=0.05, bias="none", task_type="CAUSAL_LM"
+    # )
+    config = AdaptionPromptConfig(adapter_len=10,adapter_layers=30, task_type="CAUSAL_LM")
     model = get_peft_model(model, config)
     print_trainable_parameters(model)
 
@@ -68,14 +70,14 @@ def train(
         model=model,
         train_dataset=data["train"],
         args=transformers.TrainingArguments(
-            per_device_train_batch_size=4,
-            gradient_accumulation_steps=4,
+            per_device_train_batch_size=per_device_train_batch_size,
+            gradient_accumulation_steps=gradient_accumulation_steps,
             warmup_steps=100,
-            max_steps=200,
-            learning_rate=2e-4,
+            num_train_epochs=num_epochs,
+            learning_rate=learning_rate,
             fp16=True,
             logging_steps=1,
-            output_dir="outputs",
+            output_dir=output_dir,
         ),
         data_collator=transformers.DataCollatorForLanguageModeling(tokenizer, mlm=False),
     )
