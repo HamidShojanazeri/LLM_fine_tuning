@@ -43,7 +43,7 @@ def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulatio
                 total_loss += loss.detach().float()
                 loss = loss / gradient_accumulation_steps
                 loss.backward(loss)
-                if step % gradient_accumulation_steps == 0 or step == len(train_dataloader) - 1:
+                if (step+1)% gradient_accumulation_steps == 0 or step == len(train_dataloader) - 1:
                     optimizer.step()
                     lr_scheduler.step()
                     optimizer.zero_grad()
@@ -69,7 +69,7 @@ def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulatio
         dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
     train_epoch_loss = total_loss / len(train_dataloader)
     train_perplexity = torch.exp(train_epoch_loss)
-    print(f"{epoch=}: {train_perplexity=} {train_epoch_loss=}")
+    print(f"Epoch {epoch+1}: train_perplexity={train_perplexity:.4f}, train_epoch_loss={train_epoch_loss:.4f}")
        
 def evaluation(model, eval_dataloader):
     model.eval()
@@ -88,7 +88,7 @@ def evaluation(model, eval_dataloader):
 
 
     # Printing the GPU memory usage details such as allocated memory, peak memory, and total memory usage
-    print("GPU Memory before entering the eval : {}".format(b2mb(memtrace.begin)))
+    print("GPU Memory before entering the eval : {}".format(byte2mb(memtrace.begin)))
     print("GPU Memory consumed at the end of the eval (end-begin): {}".format(memtrace.used))
     print("GPU Peak Memory consumed during the eval (max-begin): {}".format(memtrace.peaked))
     print(
@@ -97,7 +97,7 @@ def evaluation(model, eval_dataloader):
         )
     )
 
-    print("CPU Memory before entering the eval : {}".format(b2mb(memtrace.cpu_begin)))
+    print("CPU Memory before entering the eval : {}".format(byte2mb(memtrace.cpu_begin)))
     print("CPU Memory consumed at the end of the eval (end-begin): {}".format(memtrace.cpu_used))
     print("CPU Peak Memory consumed during the eval (max-begin): {}".format(memtrace.cpu_peaked))
     print(
@@ -106,6 +106,8 @@ def evaluation(model, eval_dataloader):
         )
     )
 
-    return torch.exp(metric / n_toks)
+    eval_perplexity = torch.exp(torch.tensor(metric / n_toks))
+    print(f"Evaluation perplexity: {eval_perplexity:.4f}")
+    return eval_perplexity
     
    
