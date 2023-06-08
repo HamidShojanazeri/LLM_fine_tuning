@@ -4,7 +4,7 @@ from typing import ClassVar
 
 @dataclass
 class train_config:
-    model_name: str="t5-base"
+    model_name: str="decapoda-research/llama-7b-hf"
     run_validation: bool=True
     batch_size_training: int=4
     num_workers_dataloader: int=2
@@ -13,6 +13,7 @@ class train_config:
     gamma: float= 0.85
     use_fp16: bool=False
     mixed_precision: bool=True
+    val_batch_size: int=4
     
     
     

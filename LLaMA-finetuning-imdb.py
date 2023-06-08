@@ -39,7 +39,7 @@ def train(
     learning_rate: float=1.4e-4,
     fp16: bool=True,
     logging_steps: int=1,
-    output_dir: str="llama-adapter-1-4e-4-bs04-epochs10-4layers",  
+    output_dir: str="llama-adapter-imdb-4epochs-lr14e4",  
 ):
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
@@ -66,10 +66,10 @@ def train(
         dataset.set_format('torch', columns=['input_ids', 'attention_mask', 'label'])
         return dataset
     
-    config = LoraConfig(
-        r=16, lora_alpha=32, lora_dropout=0.05, bias="none", task_type="SEQ_CLS",inference_mode=False
-    )
-    # config = AdaptionPromptConfig(adapter_len=10,adapter_layers=4, task_type="CAUSAL_LM")
+    # config = LoraConfig(
+    #     r=8, lora_alpha=16, lora_dropout=0.05, bias="none", task_type="SEQ_CLS",inference_mode=False
+    # )
+    config = AdaptionPromptConfig(adapter_len=10,adapter_layers=4, task_type="SEQ_CLS")
     # config = PrefixTuningConfig(task_type="SEQ_CLS", num_virtual_tokens=30)
     model = get_peft_model(model, config)
     print_trainable_parameters(model)
