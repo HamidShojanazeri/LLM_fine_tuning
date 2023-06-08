@@ -31,6 +31,9 @@ from utils.generation_utils import Prompter, generate_and_tokenize_prompt, token
 from utils.train_utils import set_tokenizer_params, train, evaluation
 
 from utils.dataset_utils import get_sharded_datasets, InstructionDataset
+
+# from datasets import get_dataset
+import grammer_dataset as dg
 from peft import get_peft_config, get_peft_model, PrefixTuningConfig, TaskType, PeftType, AdaptionPromptConfig
 import configs
 from torch.distributed.fsdp import (
@@ -50,6 +53,7 @@ import torch.cuda.nccl as nccl
 import torch.distributed as dist
 from transformers.models.t5.modeling_t5 import T5Block
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
+
 
 verify_bfloat_support = (
     torch.version.cuda
@@ -221,7 +225,7 @@ def main(
         
     # model.to(torch.float32)
 
-    # tokenizer = LlamaTokenizer.from_pretrained(train_config.model_name)
+    tokenizer = LlamaTokenizer.from_pretrained(train_config.model_name)
 
     # set_tokenizer_params(tokenizer)
     
@@ -255,13 +259,23 @@ def main(
     )
 
     # shard_dataset_train, shard_dataset_val = get_sharded_datasets(data_path, val_set_size, num_shards)
-    
-    dataset_train = InstructionDataset(
-        data_path=data_path, model_path=model_path, max_words=224, partition="train"
-    )
-    dataset_val = InstructionDataset(
-        data_path=data_path, model_path=model_path, max_words=224, partition="val"
-    )
+    if train_config.dataset == "grammer_dataset":
+        dataset_train = dg.get_dataset(tokenizer, train_config.dataset_train, 512, 512, True)
+        if 0 == os.getenv("RANK"):
+            print(f"--> Training Set Len = {len(dataset_train)}")
+            print(f"using dataset {train_config.dataset_train}")
+        # print("bailing")
+
+        dataset_val = dg.get_dataset(tokenizer,train_config.dataset_test, 512, 512, True)
+        
+    elif train_config.dataset == "alpaca":
+        
+        dataset_train = InstructionDataset(
+            data_path=data_path, model_path=model_path, max_words=224, partition="train"
+        )
+        dataset_val = InstructionDataset(
+            data_path=data_path, model_path=model_path, max_words=224, partition="val"
+        )
     
     
     train_sampler = DistributedSampler(

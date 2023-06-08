@@ -14,6 +14,10 @@ class train_config:
     use_fp16: bool=False
     mixed_precision: bool=True
     val_batch_size: int=4
+    dataset: str="grammer_dataset"
+    dataset_train: str = "grammer_dataset/gtrain_1k.csv"  # grammar_13k.csv
+    dataset_test: str = "grammer_dataset/grammar_validation.csv"
+
     
     
     
