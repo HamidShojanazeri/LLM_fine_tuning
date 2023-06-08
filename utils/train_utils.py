@@ -45,7 +45,7 @@ def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulatio
             for step, batch in enumerate(tqdm(train_dataloader)):
                 for key in batch.keys():
                     batch[key] = batch[key].to(local_rank)
-                outputs = model(**batch)
+                outputs = model(input_ids=batch["source_ids"],attention_mask=batch["source_mask"], labels=batch["target_ids"])
                 loss = outputs.loss
                 total_loss += loss.detach().float()
                 loss = loss / gradient_accumulation_steps
