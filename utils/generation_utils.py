@@ -105,6 +105,7 @@ def generate_and_tokenize_prompt(data_point):
         data_point["input"],
         data_point["output"],
     )
+    add_eos_token = True
     tokenized_full_prompt = tokenize(full_prompt)
     if not train_on_inputs:
         user_prompt = prompter.generate_prompt(
