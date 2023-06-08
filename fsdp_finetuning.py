@@ -226,6 +226,14 @@ def main(
     # model.to(torch.float32)
 
     tokenizer = LlamaTokenizer.from_pretrained(train_config.model_name)
+    tokenizer.add_special_tokens(
+            {
+                "eos_token": "</s>",
+                "bos_token": "</s>",
+                "unk_token": "</s>",
+                "pad_token": '[PAD]',
+            }
+        )
 
     # set_tokenizer_params(tokenizer)
     
@@ -307,11 +315,11 @@ def main(
             drop_last=True,
             # collate_fn = data_collator,
         )
-    for step, (examples, labels, example_mask) in enumerate(tqdm(train_dataloader)):
-                print(f"================== type(batch) : {type(examples)}, len(batch): {len(examples)}, actual example {examples.size()}===================")
-                inputs = {'input_ids': examples, 'attention_mask': example_mask, 'labels': labels}
-                outputs = model(**inputs)
-                print("we could run the inference ******************")
+    # for step, (examples, labels, example_mask) in enumerate(tqdm(train_dataloader)):
+    #             print(f"================== type(batch) : {type(examples)}, len(batch): {len(examples)}, actual example {examples.size()}===================")
+    #             inputs = {'input_ids': examples, 'attention_mask': example_mask, 'labels': labels}
+    #             outputs = model(**inputs)
+    #             print("we could run the inference ******************")
   
 
 
@@ -322,7 +330,7 @@ def main(
     if torch.__version__ >= "2" and sys.platform != "win32":
         model = torch.compile(model)
 
-    train(model, train_dataloader, optimizer, scheduler, gradient_accumulation_steps, num_epochs)
+    train(model, train_dataloader, optimizer, scheduler, gradient_accumulation_steps, num_epochs, local_rank, train_config)
     evaluation(model, eval_dataloader)
     # model.save_pretrained(output_dir)
 

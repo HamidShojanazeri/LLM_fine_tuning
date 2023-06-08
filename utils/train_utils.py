@@ -23,7 +23,8 @@ from peft import (
 from transformers import LlamaForCausalLM, LlamaTokenizer
 import torch.distributed as dist
 from .memory_utils import MemoryTrace
-
+from torch.distributed.fsdp.sharded_grad_scaler import ShardedGradScaler
+scaler = ShardedGradScaler()
 
 def set_tokenizer_params(tokenizer: LlamaTokenizer):
     tokenizer.pad_token_id = 0
@@ -33,18 +34,25 @@ def set_tokenizer_params(tokenizer: LlamaTokenizer):
 def byte2mb(x):
     return int(x / 2**20)
 
-def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulation_steps, num_epochs):
+def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulation_steps, num_epochs, local_rank, train_config):
     for epoch in range(num_epochs):
         with MemoryTrace() as memtrace:
             model.train()
             total_loss = 0
-            for step, (examples, labels, example_mask) in enumerate(tqdm(train_dataloader)):
-                print(f"================== type(batch) : {type(examples)}, len(batch): {len(examples)}, actual example {examples.size()}===================")
-                inputs = {'input_ids': examples, 'attention_mask': example_mask, 'labels': labels}
-                outputs = model(**inputs)
+            # for step, (examples, labels, example_mask) in enumerate(tqdm(train_dataloader)):
+            #     print(f"================== type(batch) : {type(examples)}, len(batch): {len(examples)}, actual example {examples.size()}===================")
+            #     inputs = {'input_ids': examples, 'attention_mask': example_mask, 'labels': labels}
+            for step, batch in enumerate(tqdm(train_dataloader)):
+                for key in batch.keys():
+                    batch[key] = batch[key].to(local_rank)
+                outputs = model(**batch)
                 loss = outputs.loss
                 total_loss += loss.detach().float()
                 loss = loss / gradient_accumulation_steps
+                if train_config.fp16:
+                    scaler.scale(loss).backward()
+                    scaler.step(optimizer)
+                    scaler.update()
                 loss.backward()
                 if (step+1)% gradient_accumulation_steps == 0 or step == len(train_dataloader) - 1:
                     optimizer.step()
