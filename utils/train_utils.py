@@ -6,7 +6,7 @@ import fire
 import torch
 import transformers
 from datasets import load_dataset
-import tqdm
+from tqdm import tqdm
 """
 Unused imports:
 import torch.nn as nn
@@ -22,7 +22,8 @@ from peft import (
 )
 from transformers import LlamaForCausalLM, LlamaTokenizer
 import torch.distributed as dist
-from memory_utils import MemoryTrace
+from .memory_utils import MemoryTrace
+
 
 def set_tokenizer_params(tokenizer: LlamaTokenizer):
     tokenizer.pad_token_id = 0
@@ -37,12 +38,14 @@ def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulatio
         with MemoryTrace() as memtrace:
             model.train()
             total_loss = 0
-            for step, batch in enumerate(tqdm(train_dataloader)):
-                outputs = model(**batch)
+            for step, (examples, labels, example_mask) in enumerate(tqdm(train_dataloader)):
+                print(f"================== type(batch) : {type(examples)}, len(batch): {len(examples)}, actual example {examples.size()}===================")
+                inputs = {'input_ids': examples, 'attention_mask': example_mask, 'labels': labels}
+                outputs = model(**inputs)
                 loss = outputs.loss
                 total_loss += loss.detach().float()
                 loss = loss / gradient_accumulation_steps
-                loss.backward(loss)
+                loss.backward()
                 if (step+1)% gradient_accumulation_steps == 0 or step == len(train_dataloader) - 1:
                     optimizer.step()
                     lr_scheduler.step()
@@ -74,17 +77,19 @@ def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulatio
 def evaluation(model, eval_dataloader):
     model.eval()
     eval_preds = []
+    metric = 0.0
+    n_toks = 0
     with MemoryTrace() as memtrace:
-        for _, batch in enumerate(tqdm(eval_dataloader)):
-            batch = {k: v for k, v in batch.items() if k != "labels"}
+        for _, (examples, labels, example_mask) in enumerate(tqdm(eval_dataloader)):
+            # batch = {k: v for k, v in examples.items() if k != "labels"}
             with torch.no_grad():
                 pred = model.generate(
-                    **batch, max_new_tokens=10
+                    examples, max_new_tokens=10
                 )  
             
-            loss = F.cross_entropy(pred.flatten(0, 1), batch["labels"].flatten(0, 1), reduction="sum")
+            loss = F.cross_entropy(pred.flatten(0, 1), labels.flatten(0, 1), reduction="sum")
             metric += loss.item()
-            n_toks += batch["labels"].nelement()
+            n_toks += labels.nelement()
 
 
     # Printing the GPU memory usage details such as allocated memory, peak memory, and total memory usage
@@ -105,7 +110,8 @@ def evaluation(model, eval_dataloader):
             memtrace.cpu_peaked + byte2mb(memtrace.cpu_begin)
         )
     )
-
+    if torch.device_count()>1:
+        dist.all_reduce(metric, op=dist.ReduceOp.SUM)
     eval_perplexity = torch.exp(torch.tensor(metric / n_toks))
     print(f"Evaluation perplexity: {eval_perplexity:.4f}")
     return eval_perplexity
