@@ -245,7 +245,7 @@ def main(
     mp_policy = None
     model = FSDP(
         model,
-        use_orig_params=True,
+        # use_orig_params=True,
         auto_wrap_policy=my_auto_wrapping_policy,
         mixed_precision=mp_policy,
         sharding_strategy=fsdp_config.sharding_strategy,
@@ -298,40 +298,7 @@ def main(
                 inputs = {'input_ids': examples, 'attention_mask': example_mask, 'labels': labels}
                 outputs = model(**inputs)
                 print("we could run the inference ******************")
-    # output_dir = "./"
-    # trainer = transformers.Trainer(
-    #     model=model,
-    #     train_dataset=shard_dataset_train,
-    #     eval_dataset=shard_dataset_val,
-    #     args=transformers.TrainingArguments(
-    #         per_device_train_batch_size=train_config.val_batch_size,
-    #         output_dir=output_dir,
-    #     ),
-    #     data_collator=transformers.DataCollatorForSeq2Seq(
-    #         tokenizer, pad_to_multiple_of=8, return_tensors="pt", padding=True
-    #     ),
-    # )
-    
-    # train_dataloader = trainer.get_train_dataloader()
-    # if resume_from_checkpoint:
-    #     # Check the available weights and load them
-    #     checkpoint_name = os.path.join(
-    #         resume_from_checkpoint, "pytorch_model.bin"
-    #     )  # Full checkpoint
-    #     if not os.path.exists(checkpoint_name):
-    #         checkpoint_name = os.path.join(
-    #             resume_from_checkpoint, "adapter_model.bin"
-    #         )  # only LoRA model - LoRA config above has to fit
-    #         resume_from_checkpoint = (
-    #             False  # So the trainer won't try loading its state
-    #         )
-    #     # The two files above have a different name depending on how they were saved, but are actually the same.
-    #     if os.path.exists(checkpoint_name):
-    #         print(f"Restarting from {checkpoint_name}")
-    #         adapters_weights = torch.load(checkpoint_name)
-    #         set_peft_model_state_dict(model, adapters_weights)
-    #     else:
-    #         print(f"Checkpoint {checkpoint_name} not found")
+  
 
 
 
