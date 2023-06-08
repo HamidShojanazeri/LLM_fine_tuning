@@ -331,7 +331,7 @@ def main(
         model = torch.compile(model)
 
     train(model, train_dataloader, optimizer, scheduler, gradient_accumulation_steps, num_epochs, local_rank, train_config)
-    evaluation(model, eval_dataloader)
+    evaluation(model, eval_dataloader, local_rank)
     # model.save_pretrained(output_dir)
 
 

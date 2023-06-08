@@ -82,22 +82,25 @@ def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulatio
     train_perplexity = torch.exp(train_epoch_loss)
     print(f"Epoch {epoch+1}: train_perplexity={train_perplexity:.4f}, train_epoch_loss={train_epoch_loss:.4f}")
        
-def evaluation(model, eval_dataloader):
+def evaluation(model, eval_dataloader,local_rank ):
     model.eval()
     eval_preds = []
     metric = 0.0
     n_toks = 0
     with MemoryTrace() as memtrace:
-        for _, (examples, labels, example_mask) in enumerate(tqdm(eval_dataloader)):
+        # for _, (examples, labels, example_mask) in enumerate(tqdm(eval_dataloader)):
+        for step, batch in enumerate(tqdm(eval_dataloader)):
+            for key in batch.keys():
+                batch[key] = batch[key].to(local_rank)
             # batch = {k: v for k, v in examples.items() if k != "labels"}
             with torch.no_grad():
                 pred = model.generate(
-                    examples, max_new_tokens=10
+                    **batch, max_new_tokens=10
                 )  
             
-            loss = F.cross_entropy(pred.flatten(0, 1), labels.flatten(0, 1), reduction="sum")
+            loss = F.cross_entropy(pred.flatten(0, 1), labels=batch["target_ids"].flatten(0, 1), reduction="sum")
             metric += loss.item()
-            n_toks += labels.nelement()
+            n_toks += batch["target_ids"].nelement()
 
 
     # Printing the GPU memory usage details such as allocated memory, peak memory, and total memory usage

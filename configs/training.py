@@ -17,6 +17,7 @@ class train_config:
     dataset: str="grammer_dataset"
     dataset_train: str = "grammer_dataset/gtrain_1k.csv"  # grammar_13k.csv
     dataset_test: str = "grammer_dataset/grammar_validation.csv"
+    fp16: bool=False
 
     
     
