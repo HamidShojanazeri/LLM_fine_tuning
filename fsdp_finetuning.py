@@ -250,11 +250,11 @@ def main(
     #         data_path=data_path, model_path=model_path, max_words=224, partition="val"
     #     )
     
-    dataset_train = get_preprocessed_dataset(tokenizer, train_config.dataset, split="train")
+    dataset_train = get_preprocessed_dataset(tokenizer, train_config.dataset, split="train[0:100]")
     if 0 == os.getenv("RANK"):
             print(f"--> Training Set Len = {len(dataset_train)}")
 
-    dataset_val = get_preprocessed_dataset(tokenizer, train_config.dataset, split="validation")
+    dataset_val = get_preprocessed_dataset(tokenizer, train_config.dataset, split="validation[0:100]")
     if 0 == os.getenv("RANK"):
             print(f"--> Validation Set Len = {len(dataset_val)}")    
     
