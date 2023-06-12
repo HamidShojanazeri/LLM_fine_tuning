@@ -20,14 +20,23 @@ def test_cnn_dm(tokenizer):
     # from utils.datasets_utils import get_preprocessed_dataset
     from  utils import get_preprocessed_dataset
         
-    dataset = get_preprocessed_dataset(tokenizer, "cnn_dailymail", split="train[0:100]")
+    dataset = get_preprocessed_dataset(tokenizer, "cnn_dailymail", split="train[0:10]")
     
     print(next(iter(dataset))["input_ids"])
     print(tokenizer.decode(next(iter(dataset))["input_ids"]))
     
-    dl = torch.utils.data.DataLoader(dataset, num_workers=1)
+    from pympler.asizeof import asizeof
+    print(asizeof(dataset))
     
-    print(tokenizer.decode(next(iter(dl))["input_ids"]))
+    dataset.save_to_disk("local_data")
+    
+    print(type(dataset))
+    
+    from transformers import default_data_collator
+    
+    dl = torch.utils.data.DataLoader(dataset, num_workers=1, collate_fn=default_data_collator)
+    
+    print(next(iter(dl)))
     
     
 def test_grammar_dataset(tokenizer):
@@ -36,4 +45,12 @@ def test_grammar_dataset(tokenizer):
     dataset = get_dataset(tokenizer, csv_name="grammer_dataset/grammar_validation.csv")
     
     print(next(iter(dataset)))
+    
+    from pympler.asizeof import asizeof
+    print(asizeof(dataset))
+    
+    
+    dl = torch.utils.data.DataLoader(dataset, num_workers=1)
+    
+    print(next(iter(dl)))
     

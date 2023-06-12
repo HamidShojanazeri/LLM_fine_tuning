@@ -171,7 +171,6 @@ class InstructionDataset(Dataset):
 
 
 residual = {"input_ids": [], "attention_mask": []}
-
 def _get_preprocessed_cnn_dailymail(tokenizer, split):
     dataset = datasets.load_dataset("cnn_dailymail", "3.0.0" ,split=split)
 
@@ -187,7 +186,7 @@ def _get_preprocessed_cnn_dailymail(tokenizer, split):
                 eos_token=tokenizer.eos_token,
             )
         }
-
+        
     dataset = dataset.map(apply_prompt_template, remove_columns=list(dataset.features))
 
     def concatenate_batches(batch, chunk_size=2048):
@@ -209,17 +208,19 @@ def _get_preprocessed_cnn_dailymail(tokenizer, split):
         else:
             result = concatenated_samples
             residual = {k: [] for k in concatenated_samples.keys()}
-
+        
         result["labels"] = result["input_ids"].copy()
 
         return result
-
+    
     dataset = dataset.map(
         lambda sample: tokenizer(sample["text"]),
         batched=True,
         remove_columns=list(dataset.features),
     ).map(concatenate_batches, batched=True)
     return dataset
+
+
 def get_preprocessed_dataset(tokenizer, dataset_ident: str, split: str = "train") -> torch.utils.data.Dataset:
     if not dataset_ident in VALID_DATASET:
         raise NotImplemented

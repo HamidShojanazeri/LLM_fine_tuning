@@ -7,7 +7,7 @@ class train_config:
     model_name: str="decapoda-research/llama-7b-hf"
     run_validation: bool=True
     batch_size_training: int=4
-    num_workers_dataloader: int=1
+    num_workers_dataloader: int=2
     lr: float=2e-4
     weight_decay: float=0.0
     gamma: float= 0.85
