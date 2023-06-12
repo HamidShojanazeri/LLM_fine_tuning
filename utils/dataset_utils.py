@@ -2,7 +2,7 @@ import os
 import sys
 from functools import partial
 from itertools import chain
-from typing import List
+from typing import Any, List
 
 import fire
 import torch
@@ -172,8 +172,6 @@ class InstructionDataset(Dataset):
 
 residual = {"input_ids": [], "attention_mask": []}
 
-
-# remainder = {"input_ids": [], "attention_mask": [], "token_type_ids": []}
 def _get_preprocessed_cnn_dailymail(tokenizer, split):
     dataset = datasets.load_dataset("cnn_dailymail", "3.0.0" ,split=split)
 
@@ -222,7 +220,6 @@ def _get_preprocessed_cnn_dailymail(tokenizer, split):
         remove_columns=list(dataset.features),
     ).map(concatenate_batches, batched=True)
     return dataset
-
 def get_preprocessed_dataset(tokenizer, dataset_ident: str, split: str = "train") -> torch.utils.data.Dataset:
     if not dataset_ident in VALID_DATASET:
         raise NotImplemented
