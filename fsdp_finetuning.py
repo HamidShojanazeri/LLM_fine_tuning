@@ -32,8 +32,6 @@ from utils.train_utils import set_tokenizer_params, train, evaluation
 
 from utils.dataset_utils import get_sharded_datasets, InstructionDataset, get_preprocessed_dataset
 
-# from datasets import get_dataset
-import grammer_dataset as dg
 from peft import get_peft_config, get_peft_model, PrefixTuningConfig, TaskType, PeftType, AdaptionPromptConfig
 import configs
 from torch.distributed.fsdp import (
@@ -232,29 +230,18 @@ def main(
             policies.apply_fsdp_checkpointing(model)
             
     # shard_dataset_train, shard_dataset_val = get_sharded_datasets(data_path, val_set_size, num_shards)
-    # if train_config.dataset == "grammer_dataset":
-    #     dataset_train = dg.get_dataset(tokenizer, train_config.dataset_train, 512, 512, True)
-    #     if 0 == os.getenv("RANK"):
-    #         print(f"--> Training Set Len = {len(dataset_train)}")
-    #         print(f"using dataset {train_config.dataset_train}")
-    #     # print("bailing")
-
-    #     dataset_val = dg.get_dataset(tokenizer,train_config.dataset_test, 512, 512, True)
-        
-    # elif train_config.dataset == "alpaca":
-        
-    #     dataset_train = InstructionDataset(
-    #         data_path=data_path, model_path=model_path, max_words=224, partition="train"
-    #     )
-    #     dataset_val = InstructionDataset(
-    #         data_path=data_path, model_path=model_path, max_words=224, partition="val"
-    #     )
     
-    dataset_train = get_preprocessed_dataset(tokenizer, train_config.dataset, split="train[0:100]")
+    dataset_train = get_preprocessed_dataset(tokenizer,
+                                             train_config.dataset_config,
+                                             split="train",
+                                             )
     if 0 == os.getenv("RANK"):
             print(f"--> Training Set Len = {len(dataset_train)}")
 
-    dataset_val = get_preprocessed_dataset(tokenizer, train_config.dataset, split="validation[0:100]")
+    dataset_val = get_preprocessed_dataset(tokenizer,
+                                           train_config.dataset_config,
+                                           split="train",
+                                           )
     if 0 == os.getenv("RANK"):
             print(f"--> Validation Set Len = {len(dataset_val)}")    
     

@@ -13,6 +13,8 @@ import json
 import copy
 from sentencepiece import SentencePieceProcessor
 
+import grammer_dataset as dg
+
 """
 Unused imports:
 import torch.nn as nn
@@ -31,7 +33,8 @@ from utils.generation_utils import generate_and_tokenize_prompt
 from typing import Optional
 import datasets
 
-VALID_DATASET = ["cnn_dailymail"]
+
+VALID_DATASET = ["alpaca", "cnn_dailymail", "grammar_dataset"]
 
 
 def get_sharded_datasets(
@@ -221,8 +224,34 @@ def _get_preprocessed_cnn_dailymail(tokenizer, split):
     return dataset
 
 
-def get_preprocessed_dataset(tokenizer, dataset_ident: str, split: str = "train") -> torch.utils.data.Dataset:
-    if not dataset_ident in VALID_DATASET:
+def get_preprocessed_dataset(tokenizer, dataset_config, split: str = "train") -> torch.utils.data.Dataset:
+    
+    if not dataset_config.dataset in VALID_DATASET:
         raise NotImplemented
-
-    return _get_preprocessed_cnn_dailymail(tokenizer, split)
+    
+    def get_split():
+        return dataset_config.train_split if split=="train" else dataset_config.test_split
+    
+    if dataset_config.dataset == "cnn_dailymail":
+        return _get_preprocessed_cnn_dailymail(
+            tokenizer,
+            dataset_config.train_split)
+        
+    elif dataset_config.dataset == "grammar_dataset":
+        return  dg.get_dataset(
+            tokenizer,
+            get_split(),
+            512,
+            512,
+            True,
+        )
+        
+    elif dataset_config.dataset == "alpaca":
+        return  InstructionDataset(
+            data_path=dataset_config.data_path,
+            model_path=dataset_config.model_path,
+            max_words=224,
+            partition=get_split(),
+        )
+    else:
+        raise NotImplemented
