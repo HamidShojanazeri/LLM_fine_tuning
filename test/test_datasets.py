@@ -1,4 +1,5 @@
 import pytest
+import torch
 
 @pytest.fixture
 def tokenizer():
@@ -21,8 +22,12 @@ def test_cnn_dm(tokenizer):
         
     dataset = get_preprocessed_dataset(tokenizer, "cnn_dailymail", split="train[0:100]")
     
-    print(len(next(iter(dataset))["input_ids"]))
+    print(next(iter(dataset))["input_ids"])
     print(tokenizer.decode(next(iter(dataset))["input_ids"]))
+    
+    dl = torch.utils.data.DataLoader(dataset, num_workers=1)
+    
+    print(tokenizer.decode(next(iter(dl))["input_ids"]))
     
     
 def test_grammar_dataset(tokenizer):
