@@ -32,8 +32,6 @@ from utils.train_utils import set_tokenizer_params, train, evaluation
 
 from utils.dataset_utils import get_sharded_datasets, InstructionDataset, get_preprocessed_dataset
 
-# from datasets import get_dataset
-import grammer_dataset as dg
 from peft import get_peft_config, get_peft_model, PrefixTuningConfig, TaskType, PeftType, AdaptionPromptConfig
 import configs
 from torch.distributed.fsdp import (
@@ -127,9 +125,7 @@ def get_parameter_dtypes(model):
 def main(
     # model/data params
     base_model: str = "",  # the only required argument
-    data_path: str = "/data/home/hamidnazeri/stanford_alpaca/alpaca_data.json",
     output_dir: str = "./lora-alpaca",
-    model_path = "/data/home/hamidnazeri/LLM_fine_tuning/model/models--decapoda-research--llama-7b-hf/snapshots/5f98eefcc80e437ef68d457ad7bf167c2c6a1348/",
     # training hyperparams
     batch_size: int = 128,
     micro_batch_size: int = 4,
@@ -267,29 +263,18 @@ def main(
     )
 
     # shard_dataset_train, shard_dataset_val = get_sharded_datasets(data_path, val_set_size, num_shards)
-    # if train_config.dataset == "grammer_dataset":
-    #     dataset_train = dg.get_dataset(tokenizer, train_config.dataset_train, 512, 512, True)
-    #     if 0 == os.getenv("RANK"):
-    #         print(f"--> Training Set Len = {len(dataset_train)}")
-    #         print(f"using dataset {train_config.dataset_train}")
-    #     # print("bailing")
-
-    #     dataset_val = dg.get_dataset(tokenizer,train_config.dataset_test, 512, 512, True)
-        
-    # elif train_config.dataset == "alpaca":
-        
-    #     dataset_train = InstructionDataset(
-    #         data_path=data_path, model_path=model_path, max_words=224, partition="train"
-    #     )
-    #     dataset_val = InstructionDataset(
-    #         data_path=data_path, model_path=model_path, max_words=224, partition="val"
-    #     )
     
-    dataset_train = get_preprocessed_dataset(tokenizer, train_config.dataset, split="train[0:100]")
+    dataset_train = get_preprocessed_dataset(tokenizer,
+                                             train_config.dataset_config,
+                                             split="train",
+                                             )
     if 0 == os.getenv("RANK"):
             print(f"--> Training Set Len = {len(dataset_train)}")
 
-    dataset_val = get_preprocessed_dataset(tokenizer, train_config.dataset, split="validation[0:100]")
+    dataset_val = get_preprocessed_dataset(tokenizer,
+                                           train_config.dataset_config,
+                                           split="train",
+                                           )
     if 0 == os.getenv("RANK"):
             print(f"--> Validation Set Len = {len(dataset_val)}")    
     
@@ -322,15 +307,7 @@ def main(
             drop_last=True,
             collate_fn = default_data_collator,
         )
-    # for step, (examples, labels, example_mask) in enumerate(tqdm(train_dataloader)):
-    #             print(f"================== type(batch) : {type(examples)}, len(batch): {len(examples)}, actual example {examples.size()}===================")
-    #             inputs = {'input_ids': examples, 'attention_mask': example_mask, 'labels': labels}
-    #             outputs = model(**inputs)
-    #             print("we could run the inference ******************")
-  
-
-
-
+    
     optimizer = optim.AdamW(model.parameters(), lr=train_config.lr, weight_decay=0.0)
     scheduler = StepLR(optimizer, step_size=1, gamma=train_config.gamma)
     
