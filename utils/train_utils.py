@@ -59,12 +59,9 @@ def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulatio
             total_loss = 0.0
 
             for step, batch in enumerate(tqdm(train_dataloader)):
-                # Move batch to device only if necessary
-                if batch['source_ids'].device != local_rank:
-                    for key in batch.keys():
-                        batch[key] = batch[key].to(local_rank)
-                
-                outputs = model(input_ids=batch["source_ids"], attention_mask=batch["source_mask"], labels=batch["target_ids"])
+                for key in batch.keys():
+                    batch[key] = batch[key].to(local_rank)
+                outputs = model(**batch)
                 loss = outputs.loss
                 total_loss += loss.detach().float()
                 loss = loss / gradient_accumulation_steps

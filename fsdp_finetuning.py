@@ -24,7 +24,7 @@ from peft import (
     set_peft_model_state_dict,
 )
 from utils import fsdp_auto_wrap_policy
-from transformers import LlamaForCausalLM, LlamaTokenizer, AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import LlamaForCausalLM, LlamaTokenizer, AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer, default_data_collator
 import torch.distributed as dist
 from utils.generation_utils import Prompter, generate_and_tokenize_prompt, tokenize
 
@@ -275,7 +275,7 @@ def main(
         pin_memory=False,
         sampler=train_sampler if train_sampler else None,
         drop_last=True,
-        # collate_fn = data_collator,
+        collate_fn = default_data_collator,
     )
 
     if train_config.run_validation:
@@ -286,7 +286,7 @@ def main(
             pin_memory=False,
             sampler=val_sampler if val_sampler else None,
             drop_last=True,
-            # collate_fn = data_collator,
+            collate_fn = default_data_collator,
         )
     if fsdp_config.optimizer =="anyprecision":
         optimizer = AnyPrecisionAdamW(
