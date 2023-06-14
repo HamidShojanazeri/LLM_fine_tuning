@@ -227,7 +227,7 @@ def _get_preprocessed_cnn_dailymail(tokenizer, split):
 def get_preprocessed_dataset(tokenizer, dataset_config, split: str = "train") -> torch.utils.data.Dataset:
     
     if not dataset_config.dataset in VALID_DATASET:
-        raise NotImplemented
+        raise NotImplementedError(f"{dataset_config.dataset} is not (yet) implemented")
     
     def get_split():
         return dataset_config.train_split if split=="train" else dataset_config.test_split
@@ -253,5 +253,3 @@ def get_preprocessed_dataset(tokenizer, dataset_config, split: str = "train") ->
             max_words=224,
             partition=get_split(),
         )
-    else:
-        raise NotImplemented
