@@ -3,9 +3,25 @@
 
 Want to test quickly? run the follwin on one consumer grade GPU, A10, T4, V100, etc.
 
+One GPU :
+
 ```bash
 pip install -r requirements.txt
-python LLaMA-finetuning-english-qoute.py --quznitzation 
+python fsdp_finetuning.py --quznitzation 
+
+```
+
+Multi GPU One Node:
+```bash
+pip install -r requirements.txt
+python fsdp_finetuning.py --quznitzation --train_strategy fsdp
+
+```
+Multi GPU Multi Node:
+
+```bash
+pip install -r requirements.txt
+python fsdp.slurm --num_nodes --num_gpu
 
 ```
 
