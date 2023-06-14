@@ -9,6 +9,7 @@ class fsdp_config:
     seed: int=42
     sharding_strategy: ShardingStrategy = ShardingStrategy.FULL_SHARD
     fsdp_activation_checkpointing: bool=True
+    pure_bf16: bool = False
     
     
     
