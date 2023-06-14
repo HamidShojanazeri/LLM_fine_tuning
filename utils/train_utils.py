@@ -120,15 +120,13 @@ def evaluation(model, eval_dataloader, local_rank, tokenizer):
     
     with MemoryTrace() as memtrace:
         for step, batch in enumerate(tqdm(eval_dataloader)):
-            # Move batch to device only if necessary
-            if batch['source_ids'].device != local_rank:
-                for key in batch.keys():
-                    batch[key] = batch[key].to(local_rank)
+            for key in batch.keys():
+                batch[key] = batch[key].to(local_rank)
                     
             # Ensure no gradients are computed for this scope to save memory
             with torch.no_grad():
                 # Forward pass and compute loss
-                outputs = model(input_ids=batch["source_ids"], labels= batch["target_ids"] )
+                outputs = model(**batch)
                 loss = outputs.loss
                 eval_loss += loss.detach().float()
                 
