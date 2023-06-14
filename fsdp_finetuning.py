@@ -125,42 +125,9 @@ def get_parameter_dtypes(model):
     return parameter_dtypes
       
 def main(
-    # model/data params
-    base_model: str = "",  # the only required argument
-    data_path: str = "/data/home/hamidnazeri/stanford_alpaca/alpaca_data.json",
-    output_dir: str = "./lora-alpaca",
-    model_path = "/data/home/hamidnazeri/LLM_fine_tuning/model/models--decapoda-research--llama-7b-hf/snapshots/5f98eefcc80e437ef68d457ad7bf167c2c6a1348/",
-    # training hyperparams
-    batch_size: int = 128,
-    micro_batch_size: int = 4,
-    num_epochs: int = 3,
-    learning_rate: float = 3e-4,
-    cutoff_len: int = 256,
-    val_set_size: int = 2000,
-    num_shards: int=20,
-    # lora hyperparams
-    lora_r: int = 8,
-    lora_alpha: int = 16,
-    lora_dropout: float = 0.05,
-    lora_target_modules: List[str] = [
-        "q_proj",
-        "v_proj",
-    ],
-    # llm hyperparams
-    train_on_inputs: bool = True,  # if False, masks out inputs in loss
-    add_eos_token: bool = False,
-    group_by_length: bool = False,  # faster, but produces an odd training loss curve
-    # PEFT configs
-    peft_method: str="lora",
-    resume_from_checkpoint: str = None,  # either training checkpoint or final adapter
-    prompt_template_name: str = "alpaca",  # The prompt template to use, will default to alpaca.
+    quantization: bool= False,
+    one_gpu: bool= False,
 ):
-    if int(os.environ.get("LOCAL_RANK", 0)) == 0:
-       
-        assert (
-            train_config.model_name
-        ), "Please specify a --base_model, e.g. --base_model='huggyllama/llama-7b'"
-        
     
     torch.cuda.manual_seed(fsdp_config.seed)
     torch.manual_seed(fsdp_config.seed)
@@ -173,7 +140,7 @@ def main(
     #setup process group 
   
      
-    
+    peft_method = train_config.peft_method
     if peft_method=="lora":
         from configs import lora_config
         print(lora_config)
@@ -200,29 +167,26 @@ def main(
             task_type=prefix_config.task_type
             )
     
-    gradient_accumulation_steps = batch_size // micro_batch_size
-
-    # device_map = "auto"
-    # world_size = int(os.environ.get("WORLD_SIZE", 1))
-    # ddp = world_size != 1
-    # if ddp:
-    #     device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)}
-    #     gradient_accumulation_steps = gradient_accumulation_steps // world_size
+    gradient_accumulation_steps = train_config.batch_size_training // train_config.micro_batch_size
 
     
     model = LlamaForCausalLM.from_pretrained(
         train_config.model_name,
-        # load_in_8bit=True,
-        # torch_dtype=torch.float16,
-        # device_map=device_map,
+        load_in_8bit=True if quantization else False,
+        torch_dtype=torch.float16 if one_gpu else torch.float32,
+        device_map="auto" if quantization else False,
     )
-    model.to(torch.bfloat16)
+    if quantization:
+        model = prepare_model_for_int8_training(model)
+    
+    if fsdp_config.pure_bf16:
+        model.to(torch.bfloat16)
+        
     if rank==0:
         parameter_dtypes = get_parameter_dtypes(model)
         for name, dtype in parameter_dtypes.items():
             print(f"Parameter '{name}' dtype: {dtype}")
         
-    # model.to(torch.float32)
 
     tokenizer = LlamaTokenizer.from_pretrained(train_config.model_name)
     tokenizer.add_special_tokens(
@@ -236,8 +200,6 @@ def main(
 
     # set_tokenizer_params(tokenizer)
     
-
-    # model = prepare_model_for_int8_training(model)
 
     peft_config = LoraConfig(
         task_type=TaskType.CAUSAL_LM, inference_mode=False, r=8, lora_alpha=32, lora_dropout=0.1
@@ -265,9 +227,9 @@ def main(
             limit_all_gathers=False,
             # param_init_fn=my_init_fn
         )
-    if fsdp_config.fsdp_activation_checkpointing:
-        policies.apply_fsdp_checkpointing(model)
-        
+        if fsdp_config.fsdp_activation_checkpointing:
+            policies.apply_fsdp_checkpointing(model)
+            
     # shard_dataset_train, shard_dataset_val = get_sharded_datasets(data_path, val_set_size, num_shards)
     if train_config.dataset == "grammer_dataset":
         dataset_train = dg.get_dataset(tokenizer, train_config.dataset_train, 512, 512, True)
@@ -281,10 +243,10 @@ def main(
     elif train_config.dataset == "alpaca":
         
         dataset_train = InstructionDataset(
-            data_path=data_path, model_path=model_path, max_words=224, partition="train"
+            data_path=train_config.data_path, model_path=train_config.model_path, max_words=224, partition="train"
         )
         dataset_val = InstructionDataset(
-            data_path=data_path, model_path=model_path, max_words=224, partition="val"
+            data_path=train_config.data_path, model_path=train_config.model_path, max_words=224, partition="val"
         )
     
     if train_config.train_strategy == "fsdp":
@@ -324,8 +286,8 @@ def main(
     # if torch.__version__ >= "2" and sys.platform != "win32":
     #     model = torch.compile(model)
 
-    train(model, train_dataloader, optimizer, scheduler, gradient_accumulation_steps, num_epochs, local_rank, train_config)
-    evaluation(model, eval_dataloader, local_rank)
+    train(model, train_dataloader, optimizer, scheduler, gradient_accumulation_steps, train_config.num_epochs, local_rank, train_config)
+    evaluation(model, eval_dataloader, local_rank,tokenizer)
     # model.save_pretrained(output_dir)
 
 

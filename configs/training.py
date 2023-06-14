@@ -8,6 +8,7 @@ class train_config:
     train_strategy: str="fsdp" # not_fsdp
     run_validation: bool=True
     batch_size_training: int=4
+    num_epochs: int=3
     num_workers_dataloader: int=2
     lr: float=2e-4
     weight_decay: float=0.0
@@ -19,6 +20,12 @@ class train_config:
     dataset_train: str = "grammer_dataset/gtrain_1k.csv"  # grammar_13k.csv
     dataset_test: str = "grammer_dataset/grammar_validation.csv"
     fp16: bool=False
+    micro_batch_size: int=1
+    peft_method: str = "lora"
+    model_path: str=""
+    data_path: str = "path to alpaca data json file",
+    output_dir: str = "./lora-alpaca",
+    
 
     
     
