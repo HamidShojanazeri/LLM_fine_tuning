@@ -28,7 +28,7 @@ from transformers import LlamaForCausalLM, LlamaTokenizer, AutoModelForCausalLM,
 import torch.distributed as dist
 from utils.generation_utils import Prompter, generate_and_tokenize_prompt, tokenize
 
-from utils.train_utils import set_tokenizer_params, train, evaluation
+from utils.train_utils import set_tokenizer_params, train, evaluation, freeze_transformer_layers, check_frozen_layers_peft_model
 
 from utils.dataset_utils import get_sharded_datasets, InstructionDataset
 
@@ -180,6 +180,7 @@ def main(
     if quantization:
         model = prepare_model_for_int8_training(model)
     
+  
     # if fsdp_config.pure_bf16:
     model.to(torch.bfloat16)
         
@@ -208,6 +209,9 @@ def main(
     model = get_peft_model(model, peft_config)
     model.print_trainable_parameters()  # Be more transparent about the % of trainable params.
     
+    # uncommnet next line if you like to check peft model frozen layers
+    # check_frozen_layers_peft_model(model)
+    
     setup()
     
     if torch.distributed.is_initialized():
@@ -215,6 +219,10 @@ def main(
     
     #Getting fsdp configs
     if train_config.train_strategy == "fsdp":
+        if train_config.peft_method == "None" and train_config.freeze_layers:
+            num_layers = 1
+            freeze_transformer_layers(num_layers)
+       
         mp_policy = get_policies(fsdp_config, rank)
         my_auto_wrapping_policy = fsdp_auto_wrap_policy(model, LlamaDecoderLayer)
         mp_policy = None
@@ -230,6 +238,8 @@ def main(
         )
         if fsdp_config.fsdp_activation_checkpointing:
             policies.apply_fsdp_checkpointing(model)
+        
+      
             
     # shard_dataset_train, shard_dataset_val = get_sharded_datasets(data_path, val_set_size, num_shards)
     if train_config.dataset == "grammer_dataset":
