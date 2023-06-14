@@ -5,6 +5,7 @@ from typing import ClassVar
 @dataclass
 class train_config:
     model_name: str="decapoda-research/llama-7b-hf"
+    train_strategy: str="fsdp" # not_fsdp
     run_validation: bool=True
     batch_size_training: int=4
     num_workers_dataloader: int=2

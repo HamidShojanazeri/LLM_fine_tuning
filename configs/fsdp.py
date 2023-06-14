@@ -8,6 +8,7 @@ class fsdp_config:
     use_fp16: bool=True
     seed: int=42
     sharding_strategy: ShardingStrategy = ShardingStrategy.FULL_SHARD
+    fsdp_activation_checkpointing: bool=True
     
     
     

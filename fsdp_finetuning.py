@@ -209,8 +209,7 @@ def main(
     #     device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)}
     #     gradient_accumulation_steps = gradient_accumulation_steps // world_size
 
-
-
+    
     model = LlamaForCausalLM.from_pretrained(
         train_config.model_name,
         # load_in_8bit=True,
@@ -252,20 +251,23 @@ def main(
         torch.cuda.set_device(rank)
     
     #Getting fsdp configs
-    mp_policy = get_policies(fsdp_config, rank)
-    my_auto_wrapping_policy = fsdp_auto_wrap_policy(model, LlamaDecoderLayer)
-    mp_policy = None
-    model = FSDP(
-        model,
-        # use_orig_params=True,
-        auto_wrap_policy=my_auto_wrapping_policy,
-        mixed_precision=mp_policy,
-        sharding_strategy=fsdp_config.sharding_strategy,
-        device_id=torch.cuda.current_device(),
-        limit_all_gathers=False,
-        # param_init_fn=my_init_fn
-    )
-
+    if train_config.train_strategy == "fsdp":
+        mp_policy = get_policies(fsdp_config, rank)
+        my_auto_wrapping_policy = fsdp_auto_wrap_policy(model, LlamaDecoderLayer)
+        mp_policy = None
+        model = FSDP(
+            model,
+            # use_orig_params=True,
+            auto_wrap_policy=my_auto_wrapping_policy,
+            mixed_precision=mp_policy,
+            sharding_strategy=fsdp_config.sharding_strategy,
+            device_id=torch.cuda.current_device(),
+            limit_all_gathers=False,
+            # param_init_fn=my_init_fn
+        )
+    if fsdp_config.fsdp_activation_checkpointing:
+        policies.apply_fsdp_checkpointing(model)
+        
     # shard_dataset_train, shard_dataset_val = get_sharded_datasets(data_path, val_set_size, num_shards)
     if train_config.dataset == "grammer_dataset":
         dataset_train = dg.get_dataset(tokenizer, train_config.dataset_train, 512, 512, True)
@@ -285,10 +287,10 @@ def main(
             data_path=data_path, model_path=model_path, max_words=224, partition="val"
         )
     
-    
-    train_sampler = DistributedSampler(
-        dataset_train, rank=dist.get_rank(), num_replicas=dist.get_world_size(), shuffle=True
-    )
+    if train_config.train_strategy == "fsdp":
+        train_sampler = DistributedSampler(
+            dataset_train, rank=dist.get_rank(), num_replicas=dist.get_world_size(), shuffle=True
+        )
 
     if train_config.run_validation:
         val_sampler = DistributedSampler(
@@ -300,7 +302,7 @@ def main(
         batch_size=train_config.batch_size_training,
         num_workers=train_config.num_workers_dataloader,
         pin_memory=False,
-        sampler=train_sampler,
+        sampler=train_sampler if train_sampler else None,
         drop_last=True,
         # collate_fn = data_collator,
     )
@@ -311,24 +313,16 @@ def main(
             batch_size=train_config.val_batch_size,
             num_workers=train_config.num_workers_dataloader,
             pin_memory=False,
-            sampler=val_sampler,
+            sampler=val_sampler if val_sampler else None,
             drop_last=True,
             # collate_fn = data_collator,
         )
-    # for step, (examples, labels, example_mask) in enumerate(tqdm(train_dataloader)):
-    #             print(f"================== type(batch) : {type(examples)}, len(batch): {len(examples)}, actual example {examples.size()}===================")
-    #             inputs = {'input_ids': examples, 'attention_mask': example_mask, 'labels': labels}
-    #             outputs = model(**inputs)
-    #             print("we could run the inference ******************")
   
-
-
-
     optimizer = optim.AdamW(model.parameters(), lr=train_config.lr, weight_decay=0.0)
     scheduler = StepLR(optimizer, step_size=1, gamma=train_config.gamma)
     
-    if torch.__version__ >= "2" and sys.platform != "win32":
-        model = torch.compile(model)
+    # if torch.__version__ >= "2" and sys.platform != "win32":
+    #     model = torch.compile(model)
 
     train(model, train_dataloader, optimizer, scheduler, gradient_accumulation_steps, num_epochs, local_rank, train_config)
     evaluation(model, eval_dataloader, local_rank)

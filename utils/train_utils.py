@@ -76,7 +76,7 @@ def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulatio
                     memtrace.cpu_peaked + byte2mb(memtrace.cpu_begin)
                 )
             )
-    if torch.device_count()>1:
+    if torch.cuda.device_count()>1:
         dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
     train_epoch_loss = total_loss / len(train_dataloader)
     train_perplexity = torch.exp(train_epoch_loss)
@@ -92,13 +92,14 @@ def evaluation(model, eval_dataloader,local_rank ):
         for step, batch in enumerate(tqdm(eval_dataloader)):
             for key in batch.keys():
                 batch[key] = batch[key].to(local_rank)
-            # batch = {k: v for k, v in examples.items() if k != "labels"}
             with torch.no_grad():
+                model.forward(input_ids=batch["source_ids"])
                 pred = model.generate(
-                    **batch, max_new_tokens=10
+                    input_ids=batch["source_ids"], max_length=10
                 )  
-            
-            loss = F.cross_entropy(pred.flatten(0, 1), labels=batch["target_ids"].flatten(0, 1), reduction="sum")
+            batch["target_ids"] = batch["target_ids"].float()
+            pred = pred.float()
+            loss = F.cross_entropy(pred.flatten(0, 1), batch["target_ids"].flatten(0, 1), reduction="sum")
             metric += loss.item()
             n_toks += batch["target_ids"].nelement()
 
