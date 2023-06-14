@@ -41,6 +41,7 @@ from torch.distributed.fsdp import (
     MixedPrecision,
     StateDictType,
 )
+from anyprecision_optimizer import AnyPrecisionAdamW
 from torch.utils.data import DistributedSampler
 from torch.distributed.fsdp._common_utils import _is_fsdp_flattened
 import policies 
@@ -172,15 +173,15 @@ def main(
     
     model = LlamaForCausalLM.from_pretrained(
         train_config.model_name,
-        load_in_8bit=True if quantization else False,
-        torch_dtype=torch.float16 if one_gpu else torch.float32,
-        device_map="auto" if quantization else False,
+        # load_in_8bit=True if quantization else None,
+        # torch_dtype=torch.float16 if one_gpu else torch.float32,
+        # device_map="auto" if quantization else False,
     )
     if quantization:
         model = prepare_model_for_int8_training(model)
     
-    if fsdp_config.pure_bf16:
-        model.to(torch.bfloat16)
+    # if fsdp_config.pure_bf16:
+    model.to(torch.bfloat16)
         
     if rank==0:
         parameter_dtypes = get_parameter_dtypes(model)
@@ -279,8 +280,17 @@ def main(
             drop_last=True,
             # collate_fn = data_collator,
         )
-  
-    optimizer = optim.AdamW(model.parameters(), lr=train_config.lr, weight_decay=0.0)
+    if fsdp_config.optimizer =="anyprecision":
+        optimizer = AnyPrecisionAdamW(
+                model.parameters(),
+                lr=train_config.lr,
+                # weight_decay=weight_decay,
+                momentum_dtype=torch.bfloat16,
+                variance_dtype=torch.bfloat16,
+                use_kahan_summation=False,
+            )
+    else:
+        optimizer = optim.AdamW(model.parameters(), lr=train_config.lr, weight_decay=0.0)
     scheduler = StepLR(optimizer, step_size=1, gamma=train_config.gamma)
     
     # if torch.__version__ >= "2" and sys.platform != "win32":
