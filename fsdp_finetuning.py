@@ -16,13 +16,6 @@ import bitsandbytes as bnb
 import torch._dynamo
 torch._dynamo.config.suppress_errors = True
 
-from peft import (
-    LoraConfig,
-    get_peft_model,
-    get_peft_model_state_dict,
-    prepare_model_for_int8_training,
-    set_peft_model_state_dict,
-)
 from utils import fsdp_auto_wrap_policy
 from transformers import LlamaForCausalLM, LlamaTokenizer, AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer, default_data_collator
 import torch.distributed as dist
@@ -31,8 +24,9 @@ from utils.generation_utils import Prompter, generate_and_tokenize_prompt, token
 from utils.train_utils import set_tokenizer_params, train, evaluation, freeze_transformer_layers, check_frozen_layers_peft_model
 
 from utils.dataset_utils import get_sharded_datasets, InstructionDataset, get_preprocessed_dataset
+from utils.config_utils import update_config, generate_peft_config, generate_dataset_config
 
-from peft import get_peft_config, get_peft_model, PrefixTuningConfig, TaskType, PeftType, AdaptionPromptConfig
+from peft import get_peft_model, TaskType, prepare_model_for_int8_training
 import configs
 from torch.distributed.fsdp import (
     FullyShardedDataParallel as FSDP,
@@ -124,9 +118,9 @@ def get_parameter_dtypes(model):
     return parameter_dtypes
       
 def main(
-    quantization: bool= False,
-    one_gpu: bool= False,
-):
+    **kwargs
+):  
+    update_config((train_config, fsdp_config), **kwargs)
     
     torch.cuda.manual_seed(fsdp_config.seed)
     torch.manual_seed(fsdp_config.seed)
@@ -135,47 +129,17 @@ def main(
     local_rank = int(os.environ["LOCAL_RANK"])
     rank = int(os.environ["RANK"])
     world_size = int(os.environ["WORLD_SIZE"])
-    
-    #setup process group 
-  
      
-    peft_method = train_config.peft_method
-    if peft_method=="lora":
-        from configs import lora_config
-        print(lora_config)
-        peft_config = LoraConfig(
-            r=lora_config.r,
-            lora_alpha=lora_config.lora_alpha,
-            target_modules=lora_config.target_modules,
-            lora_dropout=lora_config.lora_dropout,
-            bias=lora_config.bias,
-            task_type=lora_config.task_type,
-        )
-    elif peft_method=="llama_adapter":
-        from configs import llama_adapter_config
-        peft_config = AdaptionPromptConfig(
-            adapter_len=llama_adapter_config.adapter_len,
-            adapter_layers=llama_adapter_config.adapter_layers, 
-            task_type=llama_adapter_config.task_type)
-        
-        
-    elif peft_method=="prefix":
-        from configs import prefix_config
-        peft_config = PrefixTuningConfig(
-            num_virtual_tokens=prefix_config.num_virtual_tokens,
-            task_type=prefix_config.task_type
-            )
-    
     gradient_accumulation_steps = train_config.batch_size_training // train_config.micro_batch_size
 
     
     model = LlamaForCausalLM.from_pretrained(
         train_config.model_name,
-        # load_in_8bit=True if quantization else None,
-        # torch_dtype=torch.float16 if one_gpu else torch.float32,
-        # device_map="auto" if quantization else False,
+        # load_in_8bit=True if train_config.quantization else None,
+        # torch_dtype=torch.float16 if train_config.one_gpu else torch.float32,
+        # device_map="auto" if train_config.quantization else False,
     )
-    if quantization:
+    if train_config.quantization:
         model = prepare_model_for_int8_training(model)
     
   
@@ -200,10 +164,8 @@ def main(
 
     # set_tokenizer_params(tokenizer)
     
+    # peft_config = generate_peft_config(train_config, kwargs)
 
-    peft_config = LoraConfig(
-        task_type=TaskType.CAUSAL_LM, inference_mode=False, r=8, lora_alpha=32, lora_dropout=0.1
-    )
     model = get_peft_model(model, peft_config)
     model.print_trainable_parameters()  # Be more transparent about the % of trainable params.
     
@@ -241,16 +203,18 @@ def main(
             
     # shard_dataset_train, shard_dataset_val = get_sharded_datasets(data_path, val_set_size, num_shards)
     
+    # dataset_config = generate_dataset_config(train_config, kwargs)
+    
     dataset_train = get_preprocessed_dataset(tokenizer,
-                                             train_config.dataset_config,
+                                             dataset_config,
                                              split="train",
                                              )
     if 0 == os.getenv("RANK"):
             print(f"--> Training Set Len = {len(dataset_train)}")
 
     dataset_val = get_preprocessed_dataset(tokenizer,
-                                           train_config.dataset_config,
-                                           split="train",
+                                           dataset_config,
+                                           split="test",
                                            )
     if 0 == os.getenv("RANK"):
             print(f"--> Validation Set Len = {len(dataset_val)}")    
