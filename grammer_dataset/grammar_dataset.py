@@ -101,11 +101,16 @@ class grammar(Dataset):
         src_mask = source["attention_mask"].squeeze()
         target_mask = targets["attention_mask"].squeeze()
 
+        # return {
+        #     "source_ids": source_ids,
+        #     "source_mask": src_mask,
+        #     "target_ids": target_ids,
+        #     "target_mask": target_mask,
+        # }
         return {
-            "source_ids": source_ids,
-            "source_mask": src_mask,
-            "target_ids": target_ids,
-            "target_mask": target_mask,
+            "input_ids": source_ids,
+            "attention_mask": src_mask,
+            "labels": target_ids
         }
 
 

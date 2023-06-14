@@ -24,16 +24,14 @@ from peft import (
     set_peft_model_state_dict,
 )
 from utils import fsdp_auto_wrap_policy
-from transformers import LlamaForCausalLM, LlamaTokenizer, AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import LlamaForCausalLM, LlamaTokenizer, AutoModelForCausalLM, AutoModelForSeq2SeqLM, AutoTokenizer, default_data_collator
 import torch.distributed as dist
 from utils.generation_utils import Prompter, generate_and_tokenize_prompt, tokenize
 
 from utils.train_utils import set_tokenizer_params, train, evaluation, freeze_transformer_layers, check_frozen_layers_peft_model
 
-from utils.dataset_utils import get_sharded_datasets, InstructionDataset
+from utils.dataset_utils import get_sharded_datasets, InstructionDataset, get_preprocessed_dataset
 
-# from datasets import get_dataset
-import grammer_dataset as dg
 from peft import get_peft_config, get_peft_model, PrefixTuningConfig, TaskType, PeftType, AdaptionPromptConfig
 import configs
 from torch.distributed.fsdp import (
@@ -242,23 +240,20 @@ def main(
       
             
     # shard_dataset_train, shard_dataset_val = get_sharded_datasets(data_path, val_set_size, num_shards)
-    if train_config.dataset == "grammer_dataset":
-        dataset_train = dg.get_dataset(tokenizer, train_config.dataset_train, 512, 512, True)
-        if 0 == os.getenv("RANK"):
+    
+    dataset_train = get_preprocessed_dataset(tokenizer,
+                                             train_config.dataset_config,
+                                             split="train",
+                                             )
+    if 0 == os.getenv("RANK"):
             print(f"--> Training Set Len = {len(dataset_train)}")
-            print(f"using dataset {train_config.dataset_train}")
-        # print("bailing")
 
-        dataset_val = dg.get_dataset(tokenizer,train_config.dataset_test, 512, 512, True)
-        
-    elif train_config.dataset == "alpaca":
-        
-        dataset_train = InstructionDataset(
-            data_path=train_config.data_path, model_path=train_config.model_path, max_words=224, partition="train"
-        )
-        dataset_val = InstructionDataset(
-            data_path=train_config.data_path, model_path=train_config.model_path, max_words=224, partition="val"
-        )
+    dataset_val = get_preprocessed_dataset(tokenizer,
+                                           train_config.dataset_config,
+                                           split="train",
+                                           )
+    if 0 == os.getenv("RANK"):
+            print(f"--> Validation Set Len = {len(dataset_val)}")    
     
     if train_config.train_strategy == "fsdp":
         train_sampler = DistributedSampler(
@@ -277,7 +272,7 @@ def main(
         pin_memory=False,
         sampler=train_sampler if train_sampler else None,
         drop_last=True,
-        # collate_fn = data_collator,
+        collate_fn = default_data_collator,
     )
 
     if train_config.run_validation:
@@ -288,7 +283,7 @@ def main(
             pin_memory=False,
             sampler=val_sampler if val_sampler else None,
             drop_last=True,
-            # collate_fn = data_collator,
+            collate_fn = default_data_collator,
         )
     if fsdp_config.optimizer =="anyprecision":
         optimizer = AnyPrecisionAdamW(

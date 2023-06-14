@@ -1,6 +1,8 @@
 import os
 import sys
-from typing import List
+from functools import partial
+from itertools import chain
+from typing import Any, List
 
 import fire
 import torch
@@ -10,6 +12,9 @@ from torch.utils.data import Dataset
 import json
 import copy
 from sentencepiece import SentencePieceProcessor
+
+import grammer_dataset as dg
+
 """
 Unused imports:
 import torch.nn as nn
@@ -28,21 +33,23 @@ from utils.generation_utils import generate_and_tokenize_prompt
 from typing import Optional
 import datasets
 
+
+VALID_DATASET = ["alpaca", "cnn_dailymail", "grammar_dataset"]
+
+
 def get_sharded_datasets(
-    data_path: str, 
-    val_set_size: int = 0, 
-    num_shards: int = 1
+    data_path: str, val_set_size: int = 0, num_shards: int = 1
 ) -> tuple[datasets.Dataset, Optional[datasets.Dataset]]:
     """
     Loads a dataset from a given path and returns sharded train and validation datasets.
-    
+
     Args:
     - data_path (str): Path to the dataset file. Supports .json and .jsonl formats.
     - val_set_size (int): Size of the validation set. If 0, validation set is not created.
     - num_shards (int): Number of shards to split the dataset into.
 
     Returns:
-    A tuple of train and validation datasets (or None if no validation set is created), each sharded into 
+    A tuple of train and validation datasets (or None if no validation set is created), each sharded into
     the specified number of shards.
     """
 
@@ -57,25 +64,26 @@ def get_sharded_datasets(
         train_val = data["train"].train_test_split(
             test_size=val_set_size, shuffle=True, seed=42
         )
-        
+
         # Preprocess and tokenize train and validation sets
         shard_dataset_train = train_val["train"].shard(num_shards, index=0)
         train_data = shard_dataset_train.shuffle().map(generate_and_tokenize_prompt)
         val_data = train_val["test"]
-        shard_dataset_val = None if val_data is None else val_data.shard(num_shards, index=0)
+        shard_dataset_val = (
+            None if val_data is None else val_data.shard(num_shards, index=0)
+        )
         val_data = shard_dataset_val.shuffle().map(generate_and_tokenize_prompt)
-        
+
     else:
         # Preprocess and tokenize train set
         train_data = data["train"].shuffle().map(generate_and_tokenize_prompt)
         val_data = None
-        
+
     # Create sharded datasets
     # shard_dataset_train = train_data.shard(num_shards, index=0)
     # shard_dataset_val = None if val_data is None else val_data.shard(num_shards, index=0)
 
     return train_data, val_data
-
 
 
 PROMPT_DICT = {
@@ -90,6 +98,7 @@ PROMPT_DICT = {
         "### Instruction:\n{instruction}\n\n### Response:"
     ),
 }
+
 
 class Tokenizer:
     def __init__(self, model_path: str):
@@ -117,7 +126,8 @@ class Tokenizer:
 
     def decode(self, t: List[int]) -> str:
         return self.sp_model.decode(t)
-    
+
+
 class InstructionDataset(Dataset):
     def __init__(self, data_path, model_path, max_words=30, partition="train"):
         self.ann = json.load(open(data_path))
@@ -134,15 +144,18 @@ class InstructionDataset(Dataset):
         return len(self.ann)
 
     def __getitem__(self, index):
-
         ann = self.ann[index]
         if ann.get("input", "") == "":
             prompt = PROMPT_DICT["prompt_no_input"].format_map(ann)
         else:
             prompt = PROMPT_DICT["prompt_input"].format_map(ann)
         example = prompt + ann["output"]
-        prompt = torch.tensor(self.tokenizer1.encode(prompt, bos=True, eos=False), dtype=torch.int64)
-        example = torch.tensor(self.tokenizer1.encode(example, bos=True, eos=True), dtype=torch.int64)
+        prompt = torch.tensor(
+            self.tokenizer1.encode(prompt, bos=True, eos=False), dtype=torch.int64
+        )
+        example = torch.tensor(
+            self.tokenizer1.encode(example, bos=True, eos=True), dtype=torch.int64
+        )
         padding = self.max_words - example.shape[0]
         if padding > 0:
             example = torch.cat((example, torch.zeros(padding, dtype=torch.int64) - 1))
@@ -158,3 +171,85 @@ class InstructionDataset(Dataset):
         label_mask = label_mask.float()
 
         return example, labels, example_mask
+
+
+residual = {"input_ids": [], "attention_mask": []}
+def _get_preprocessed_cnn_dailymail(tokenizer, split):
+    dataset = datasets.load_dataset("cnn_dailymail", "3.0.0" ,split=split)
+
+    prompt = (
+        f"Summarize this article:\n{{article}}\n---\nSummary:\n{{summary}}{{eos_token}}"
+    )
+
+    def apply_prompt_template(sample):
+        return {
+            "text": prompt.format(
+                article=sample["article"],
+                summary=sample["highlights"],
+                eos_token=tokenizer.eos_token,
+            )
+        }
+        
+    dataset = dataset.map(apply_prompt_template, remove_columns=list(dataset.features))
+
+    def concatenate_batches(batch, chunk_size=2048):
+        global residual
+        concatenated_samples = residual
+        concatenated_samples = {k: v + list(chain(*batch[k])) for k, v in residual.items()}
+
+        total_length = len(concatenated_samples[list(concatenated_samples.keys())[0]])
+
+        if total_length >= chunk_size:
+            chunk_num = total_length // chunk_size
+            result = {
+                k: [v[i : i + chunk_size] for i in range(0, chunk_num * chunk_size, chunk_size)]
+                for k, v in concatenated_samples.items()
+            }
+            residual = {
+                k: v[(chunk_num * chunk_size) :] for k, v in concatenated_samples.items()
+            }
+        else:
+            result = concatenated_samples
+            residual = {k: [] for k in concatenated_samples.keys()}
+        
+        result["labels"] = result["input_ids"].copy()
+
+        return result
+    
+    dataset = dataset.map(
+        lambda sample: tokenizer(sample["text"]),
+        batched=True,
+        remove_columns=list(dataset.features),
+    ).map(concatenate_batches, batched=True)
+    return dataset
+
+
+def get_preprocessed_dataset(tokenizer, dataset_config, split: str = "train") -> torch.utils.data.Dataset:
+    
+    if not dataset_config.dataset in VALID_DATASET:
+        raise NotImplementedError(f"{dataset_config.dataset} is not (yet) implemented")
+    
+    def get_split():
+        return dataset_config.train_split if split=="train" else dataset_config.test_split
+    
+    if dataset_config.dataset == "cnn_dailymail":
+        return _get_preprocessed_cnn_dailymail(
+            tokenizer,
+            dataset_config.train_split)
+        
+    elif dataset_config.dataset == "grammar_dataset":
+        return  dg.get_dataset(
+            tokenizer,
+            get_split(),
+            512,
+            512,
+            True,
+        )
+        
+    elif dataset_config.dataset == "alpaca":
+        return  InstructionDataset(
+            data_path=dataset_config.data_path,
+            model_path=dataset_config.model_path,
+            max_words=224,
+            partition=get_split(),
+        )
