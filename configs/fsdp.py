@@ -10,6 +10,7 @@ class fsdp_config:
     sharding_strategy: ShardingStrategy = ShardingStrategy.FULL_SHARD
     fsdp_activation_checkpointing: bool=True
     pure_bf16: bool = False
+    optimizer: str= "anyprecision"
     
     
     
