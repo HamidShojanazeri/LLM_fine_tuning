@@ -164,7 +164,7 @@ def main(
 
     # set_tokenizer_params(tokenizer)
     
-    # peft_config = generate_peft_config(train_config, kwargs)
+    peft_config = generate_peft_config(train_config, kwargs)
 
     model = get_peft_model(model, peft_config)
     model.print_trainable_parameters()  # Be more transparent about the % of trainable params.
@@ -203,7 +203,7 @@ def main(
             
     # shard_dataset_train, shard_dataset_val = get_sharded_datasets(data_path, val_set_size, num_shards)
     
-    # dataset_config = generate_dataset_config(train_config, kwargs)
+    dataset_config = generate_dataset_config(train_config, kwargs)
     
     dataset_train = get_preprocessed_dataset(tokenizer,
                                              dataset_config,
