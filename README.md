@@ -7,14 +7,14 @@ One GPU :
 
 ```bash
 pip install -r requirements.txt
-python fsdp_finetuning.py --quznitzation 
+python fsdp_finetuning.py --quanitization 
 
 ```
 
 Multi GPU One Node:
 ```bash
 pip install -r requirements.txt
-python fsdp_finetuning.py --quznitzation --train_strategy fsdp
+python fsdp_finetuning.py --quanitization --train_strategy fsdp
 
 ```
 Multi GPU Multi Node:

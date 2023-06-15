@@ -5,7 +5,7 @@ from typing import ClassVar
 @dataclass
 class train_config:
     model_name: str="decapoda-research/llama-7b-hf"
-    train_strategy: str="fsdp" # not_fsdp
+    enable_fsdp: bool=False
     run_validation: bool=True
     batch_size_training: int=4
     num_epochs: int=3
@@ -22,7 +22,7 @@ class train_config:
     peft_method: str = "lora" # None , llama_adapter, prefix
     model_path: str=""
     data_path: str = "path to alpaca data json file"
-    output_dir: str = "./lora-alpaca"
+    output_dir: str = "./ft-output"
     freeze_layers: bool = False
     quantization: bool = False
     one_gpu: bool = False

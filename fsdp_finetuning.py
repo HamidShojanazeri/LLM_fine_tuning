@@ -135,7 +135,7 @@ def main(
     
     model = LlamaForCausalLM.from_pretrained(
         train_config.model_name,
-        # load_in_8bit=True if train_config.quantization else None,
+        load_in_8bit=True if train_config.quantization else None,
         # torch_dtype=torch.float16 if train_config.one_gpu else torch.float32,
         # device_map="auto" if train_config.quantization else False,
     )
@@ -143,8 +143,8 @@ def main(
         model = prepare_model_for_int8_training(model)
     
   
-    # if fsdp_config.pure_bf16:
-    model.to(torch.bfloat16)
+    if fsdp_config.pure_bf16:
+        model.to(torch.bfloat16)
         
     if rank==0:
         parameter_dtypes = get_parameter_dtypes(model)
@@ -219,15 +219,16 @@ def main(
     if 0 == os.getenv("RANK"):
             print(f"--> Validation Set Len = {len(dataset_val)}")    
     
+    train_sampler = None
+    val_sampler = None
     if train_config.train_strategy == "fsdp":
         train_sampler = DistributedSampler(
             dataset_train, rank=dist.get_rank(), num_replicas=dist.get_world_size(), shuffle=True
         )
-
-    if train_config.run_validation:
-        val_sampler = DistributedSampler(
-            dataset_val, rank=dist.get_rank(), num_replicas=dist.get_world_size()
-        )
+        if train_config.run_validation:
+            val_sampler = DistributedSampler(
+                dataset_val, rank=dist.get_rank(), num_replicas=dist.get_world_size()
+            )
  
     train_dataloader = torch.utils.data.DataLoader(
         dataset_train,
@@ -267,7 +268,7 @@ def main(
 
     train(model, train_dataloader, optimizer, scheduler, gradient_accumulation_steps, train_config.num_epochs, local_rank, train_config)
     evaluation(model, eval_dataloader, local_rank,tokenizer)
-    # model.save_pretrained(output_dir)
+    model.save_pretrained(train_config.output_dir)
 
 
 if __name__ == "__main__":
