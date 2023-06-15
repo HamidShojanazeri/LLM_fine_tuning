@@ -34,7 +34,7 @@ from typing import Optional
 import datasets
 
 
-VALID_DATASET = ["alpaca", "cnn_dailymail", "grammar_dataset"]
+VALID_DATASET = ["alpaca_dataset", "cnn_dailymail_dataset", "grammar_dataset"]
 
 
 def get_sharded_datasets(
@@ -232,7 +232,7 @@ def get_preprocessed_dataset(tokenizer, dataset_config, split: str = "train") ->
     def get_split():
         return dataset_config.train_split if split=="train" else dataset_config.test_split
     
-    if dataset_config.dataset == "cnn_dailymail":
+    if dataset_config.dataset == "cnn_dailymail_dataset":
         return _get_preprocessed_cnn_dailymail(
             tokenizer,
             dataset_config.train_split)
@@ -246,7 +246,7 @@ def get_preprocessed_dataset(tokenizer, dataset_config, split: str = "train") ->
             True,
         )
         
-    elif dataset_config.dataset == "alpaca":
+    elif dataset_config.dataset == "alpaca_dataset":
         return  InstructionDataset(
             data_path=dataset_config.data_path,
             model_path=dataset_config.model_path,
