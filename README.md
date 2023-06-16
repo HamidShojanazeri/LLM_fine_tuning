@@ -5,21 +5,39 @@ Want to test quickly? run the follwin on one consumer grade GPU, A10, T4, V100, 
 
 One GPU :
 
+Here we make use of Parameter Efficient Methods (PEFT) as described in the next section. To run the command below make sure to pass the `peft_method` arg which can be set to `lora`, `llama_adapter`, `prefix`.
+
 ```bash
 pip install -r requirements.txt
-python fsdp_finetuning.py --quanitization 
+python fsdp_finetuning.py  --use_peft --peft_method lora --quantization 
 
 ```
+
 
 Multi GPU One Node:
+
+Here we use FSDP as discussed in the next section which can be used along with PEFT methods. To make use of PEFT methods with FSDP make sure to pass `use_peft` amd `peft_method` args along with `enable_fsdp`.
+
 ```bash
+
 pip install -r requirements.txt
-python fsdp_finetuning.py --quanitization --train_strategy fsdp
+python fsdp_finetuning.py --enable_fsdp --use_peft --peft_method lora
 
 ```
+
+If interested to run full/ partial parameter finetuning without making use of PEFT methods. Then use the command below, here we would need an extra args, `freeze_layers` and `num_freeze_layers` that let FSDP know how if need to freeze layer and how many of them needs to be frozen. This would start to freeze layers from the first layer up to the number you specifiy in `num_freeze_layers`.
+
+```bash
+
+pip install -r requirements.txt
+python fsdp_finetuning.py --enable_fsdp --freeze_layers --num_freeze_layers 30
+
+```
+
 Multi GPU Multi Node:
 
 ```bash
+
 pip install -r requirements.txt
 python fsdp.slurm --num_nodes --num_gpu
 
