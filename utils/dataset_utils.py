@@ -84,7 +84,7 @@ def _get_preprocessed_cnn_dailymail(tokenizer, split):
 
     dataset = dataset.map(apply_prompt_template, remove_columns=list(dataset.features))
 
-    def concatenate_batches(batch, chunk_size=2048):
+    def concatenate_batches(batch, chunk_size=512):
         global residual
         concatenated_samples = residual
         concatenated_samples = {
@@ -150,7 +150,7 @@ def get_preprocessed_dataset(
     elif dataset_config.dataset == "alpaca_dataset":
         return InstructionDataset(
             data_path=dataset_config.data_path,
-            model_path=dataset_config.model_path,
+            tokenizer=tokenizer,
             max_words=224,
             partition=get_split(),
         )
