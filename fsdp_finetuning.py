@@ -166,8 +166,8 @@ def main(**kwargs):
             "pad_token": '[PAD]',
         }
     )
-
-    peft_config = generate_peft_config(train_config, kwargs)
+    if train_config.use_peft:
+        peft_config = generate_peft_config(train_config, kwargs)
 
     model = get_peft_model(model, peft_config)
     model.print_trainable_parameters()
@@ -177,10 +177,10 @@ def main(**kwargs):
     if torch.distributed.is_initialized():
         torch.cuda.set_device(rank)
 
-    if train_config.train_strategy == "fsdp":
-        if train_config.peft_method == "None" and train_config.freeze_layers:
-            num_layers = 1
-            freeze_transformer_layers(num_layers)
+    if train_config.enable_fsdp:
+        if not train_config.use_peft and train_config.freeze_layers:
+            
+            freeze_transformer_layers(train_config.num_freeze_layers)
 
         mp_policy = get_policies(fsdp_config, rank)
         my_auto_wrapping_policy = fsdp_auto_wrap_policy(model, LlamaDecoderLayer)
@@ -216,7 +216,7 @@ def main(**kwargs):
 
     train_sampler = None
     val_sampler = None
-    if train_config.train_strategy == "fsdp":
+    if train_config.enable_fsdp:
         train_sampler = DistributedSampler(
             dataset_train,
             rank=dist.get_rank(),
