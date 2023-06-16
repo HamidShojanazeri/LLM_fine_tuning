@@ -3,7 +3,9 @@
 
 Want to test quickly? run the follwin on one consumer grade GPU, A10, T4, V100, etc.
 
-One GPU :
+**Note** in all command below to change the dataset please pass `dataset` arg, current options for dataset are `grammar_dataset`, `alpaca_dataset`, and `cnn_dailymail_dataset`.
+
+**One GPU** :
 
 Here we make use of Parameter Efficient Methods (PEFT) as described in the next section. To run the command below make sure to pass the `peft_method` arg which can be set to `lora`, `llama_adapter`, `prefix`.
 
@@ -14,7 +16,7 @@ python fsdp_finetuning.py  --use_peft --peft_method lora --quantization
 ```
 
 
-Multi GPU One Node:
+**Multi GPU One Node**:
 
 Here we use FSDP as discussed in the next section which can be used along with PEFT methods. To make use of PEFT methods with FSDP make sure to pass `use_peft` amd `peft_method` args along with `enable_fsdp`.
 
@@ -25,16 +27,16 @@ python fsdp_finetuning.py --enable_fsdp --use_peft --peft_method lora
 
 ```
 
-If interested to run full/ partial parameter finetuning without making use of PEFT methods. Then use the command below, here we would need an extra args, `freeze_layers` and `num_freeze_layers` that let FSDP know how if need to freeze layer and how many of them needs to be frozen. This would start to freeze layers from the first layer up to the number you specifiy in `num_freeze_layers`.
+If interested to run full/ partial parameter finetuning without making use of PEFT methods. Then use the command below, here we would need an extra args, `freeze_layers` and `num_freeze_layers` that let FSDP know how if need to freeze layer and how many of them needs to be frozen. This would start to freeze layers from the first layer up to the number you specifiy in `num_freeze_layers`. Make sure to change the `nproc_per_node` to your available GPUs.
 
 ```bash
 
 pip install -r requirements.txt
-python fsdp_finetuning.py --enable_fsdp --freeze_layers --num_freeze_layers 30
+torchrun --nnodes 1 --nproc_per_node 4  fsdp_finetuning.py --enable_fsdp --freeze_layers --num_freeze_layers 30
 
 ```
 
-Multi GPU Multi Node:
+**Multi GPU Multi Node**:
 
 ```bash
 
@@ -43,7 +45,11 @@ python fsdp.slurm --num_nodes --num_gpu
 
 ```
 
-Want to learn more on our Finetuning strategies here, keep reading.
+**Inference**
+
+[WIP]
+
+Want to read more on our Finetuning strategies here, keep reading.
 
 
 ## LLM_fine_tuning
@@ -54,15 +60,6 @@ Here we discuss finetuning LLaMA with couple of different recipes. We will cover
 ## 1. **Parameter Efficient Model Finetuning** 
  This help to make the fine-tuning process much more affordable even on 1 consumer grade GPU. These methods enable us to keep the whole model frozen and just add a tiny learnable parameters/ layers into the model, so technically we just train a very tiny portion of the parameters.The most famous method in this category in [LORA](https://arxiv.org/pdf/2106.09685.pdf), LLaMA Adapter and Prefix-tuning. 
 
-**Want to give it a try?**
-
-The following script finetunes a LLaMA 7B models from HuggingFace (HF) on [english qoute dataset](https://huggingface.co/datasets/Abirate/english_quotes).
-
-```bash
-
-python LLaMA-finetuning-english-qoute.py
-
-```
 
 These methods will address three aspects
 
@@ -98,14 +95,6 @@ In this scneario depending on the model size, you might need to go beyond one GP
 
 **FSDP (FUlly Sharded Data Parallel)**
 
-**Want to give it a try?**
-
-This will finetune a LLaMA 7B model with FSDP on a grammer dataset, which requires having 4 GPUs. 
-
-```bash
- torchrun --nnodes 1 --nproc_per_node 4  fsdp_finetuning.py 
- ```
- 
 
 Pytorch for training models that does not fit into one GPU has the FSDP package. FSDP let you train a much larger model with same amount of resources. Prior to FSDP you might be familiar with DDP (Distirbuted Data Parallel) where each GPU was holding a full replica of the model and would only shard the data, at the end of backward pass it would sync up the gradinets. 
 
@@ -125,20 +114,3 @@ To boost the perfromance of finetuning with FSDP, we can make use a number of fe
 
 
 **Note** FSDP does not support of mixed `require_grad` in one FSDP unit. This means if you are planning to freeze some layers, need to do it on FSDP unit level rather model layer. In this particular case, let assume our model has 30 decoder layers and we want to freeze the bottom 28 layers and only train 2 top transformer layers. In this sense, we need to make sure `require_grad` for the top two transformer layers are set to `True`.
-
-
-
-
-### Run the Alpaca dataset with LORA method from PEFT
-
-```bash
-python fine_tune.py     --base_model 'decapoda-research/llama-7b-hf'     --data_path 'yahma/alpaca-cleaned'     --output_dir './lora-alpaca'     --batch_size 128     --micro_batch_size 4     --num_epochs 1     --learning_rate 1e-4     --cutoff_len 512     --val_set_size 2000     --lora_r 8     --lora_alpha 16     --lora_dropout 0.05     --lora_target_modules '[q_proj,v_proj]'     --train_on_inputs     --group_by_length
-```
-
-
-## Run with FSDP 
-
-```bash
- torchrun --nnodes 1 --nproc_per_node 4  fsdp_finetuning.py 
- ```
- 
