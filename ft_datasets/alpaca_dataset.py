@@ -21,36 +21,36 @@ PROMPT_DICT = {
 }
 
 
-class Tokenizer:
-    def __init__(self, model_path: str):
-        # reload tokenizer
-        assert os.path.isfile(model_path), model_path
-        self.sp_model = SentencePieceProcessor(model_file=model_path)
-        # logger.info(f"Reloaded SentencePiece model from {model_path}")
+# class Tokenizer:
+#     def __init__(self, model_path: str):
+#         # reload tokenizer
+#         assert os.path.isfile(model_path), model_path
+#         self.sp_model = SentencePieceProcessor(model_file=model_path)
+#         # logger.info(f"Reloaded SentencePiece model from {model_path}")
 
-        # BOS / EOS token IDs
-        self.n_words: int = self.sp_model.vocab_size()
-        self.bos_id: int = self.sp_model.bos_id()
-        self.eos_id: int = self.sp_model.eos_id()
-        self.pad_id: int = self.sp_model.pad_id()
-        # logger.info(f"#words: {self.n_words} - BOS ID: {self.bos_id} - EOS ID: {self.eos_id}")
-        assert self.sp_model.vocab_size() == self.sp_model.get_piece_size()
+#         # BOS / EOS token IDs
+#         self.n_words: int = self.sp_model.vocab_size()
+#         self.bos_id: int = self.sp_model.bos_id()
+#         self.eos_id: int = self.sp_model.eos_id()
+#         self.pad_id: int = self.sp_model.pad_id()
+#         # logger.info(f"#words: {self.n_words} - BOS ID: {self.bos_id} - EOS ID: {self.eos_id}")
+#         assert self.sp_model.vocab_size() == self.sp_model.get_piece_size()
 
-    def encode(self, s: str, bos: bool, eos: bool) -> List[int]:
-        assert type(s) is str
-        t = self.sp_model.encode(s)
-        if bos:
-            t = [self.bos_id] + t
-        if eos:
-            t = t + [self.eos_id]
-        return t
+#     def encode(self, s: str, bos: bool, eos: bool) -> List[int]:
+#         assert type(s) is str
+#         t = self.sp_model.encode(s)
+#         if bos:
+#             t = [self.bos_id] + t
+#         if eos:
+#             t = t + [self.eos_id]
+#         return t
 
-    def decode(self, t: List[int]) -> str:
-        return self.sp_model.decode(t)
+#     def decode(self, t: List[int]) -> str:
+#         return self.sp_model.decode(t)
 
 
 class InstructionDataset(Dataset):
-    def __init__(self, data_path, model_path, max_words=30, partition="train"):
+    def __init__(self, data_path, tokenizer, max_words=30, partition="train"):
         self.ann = json.load(open(data_path))
         if partition == "train":
             self.ann = self.ann
@@ -58,8 +58,9 @@ class InstructionDataset(Dataset):
             self.ann = self.ann[:200]
 
         self.max_words = max_words
-        tokenizer = Tokenizer(model_path=model_path + "./tokenizer.model")
-        self.tokenizer1 = tokenizer
+        # tokenizer = Tokenizer(model_path=model_path + "./tokenizer.model")
+        self.tokenizer = tokenizer
+        # self.tokenizer1 = tokenizer
 
     def __len__(self):
         return len(self.ann)
@@ -72,10 +73,12 @@ class InstructionDataset(Dataset):
             prompt = PROMPT_DICT["prompt_input"].format_map(ann)
         example = prompt + ann["output"]
         prompt = torch.tensor(
-            self.tokenizer1.encode(prompt, bos=True, eos=False), dtype=torch.int64
+            self.tokenizer.encode(prompt), dtype=torch.int64
         )
+        example = self.tokenizer.encode(example)
+        example.append(self.tokenizer.eos_token_id)
         example = torch.tensor(
-            self.tokenizer1.encode(example, bos=True, eos=True), dtype=torch.int64
+            example, dtype=torch.int64
         )
         padding = self.max_words - example.shape[0]
         if padding > 0:
