@@ -45,9 +45,15 @@ python fsdp.slurm --num_nodes --num_gpu
 
 ```
 
-**Inference**
+**Inference**:
 
-[WIP]
+The [inference script](inference.py) takes the same parameters as defined in the [configs/train_config.py](configs/train_config.py) file and runs the model on a single example.
+ The example can either piped through standard input or through the parameter --prompt_file
+ ```bash
+ cat test_prompt.txt | python inference.py --model_name llama2/model_cpkt
+# or
+python inference.py --model_name llama2/model_cpkt --prompt_file test_prompt.txt
+ ``` 
 
 Want to read more on our Finetuning strategies here, keep reading.
 
