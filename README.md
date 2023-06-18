@@ -23,7 +23,7 @@ Here we use FSDP as discussed in the next section which can be used along with P
 ```bash
 
 pip install -r requirements.txt
-python fsdp_finetuning.py --enable_fsdp --use_peft --peft_method lora
+torchrun --nnodes 1 --nproc_per_node 4  fsdp_finetuning.py fsdp_finetuning.py --enable_fsdp --use_peft --peft_method lora
 
 ```
 
@@ -84,11 +84,11 @@ Full parameter finetuning has its own advantages, in this method there are multi
 4- Keep the pretrained model frozen and add few fully connected layers on the top.
 
 [ Place holder to add three diagrams]
-<!-- <div style="display: flex;">
-    <img src="image1.jpg" alt="Image 1" width="300" />
-    <img src="image2.jpg" alt="Image 2" width="300" />
-    <img src="image3.jpg" alt="Image 3" width="300" />
-</div> -->
+<div style="display: flex;">
+    <img src="docs/feature-based_FN.png" alt="Image 1" width="300" />
+    <img src="docs/feature-based-FN-2.png" alt="Image 2" width="300" />
+    <img src="docs/full-param-FN.png" alt="Image 3" width="300" />
+</div>
 
 
 In this scneario depending on the model size, you might need to go beyond one GPU, specially if your model does not fit into one GPU for training. In this case discussing LLaMA 7B parameter, it wont fit into one gpu. The way you want to think about it is, you would need enough GPU memory to keep model parameters, gradients and optimizer states. Where each of these depending on the precision you are training can take up multiple times of your parameter count x precision( depending if its fp32/ 4bytes, fp16/2 bytes/ bf16/2 bytes). As an example if you are using AdamW optimizer it keeps 2 paramters for each of your parameters that in many cases they are kept in fp32. This implies that depending on how many layers you are training/ unfreezing your GPU memory can grow beyond one GPU. 
@@ -113,4 +113,4 @@ To boost the perfromance of finetuning with FSDP, we can make use a number of fe
 - **auto_wrap_policy** Which is the way to specify how FSDP would partition the model, there is default support for transfomrer wrapping policy. This allows FSDP to form each FSDP unit ( partition of the  model ) based on the transformer class in the model. To identify this layer in the model, need to look at the layer that wraps both attention layer and  MLP. This help FSDP to have much fine-grained units for communication that help with optimizing the communication cost.
 
 
-**Note** FSDP does not support of mixed `require_grad` in one FSDP unit. This means if you are planning to freeze some layers, need to do it on FSDP unit level rather model layer. In this particular case, let assume our model has 30 decoder layers and we want to freeze the bottom 28 layers and only train 2 top transformer layers. In this sense, we need to make sure `require_grad` for the top two transformer layers are set to `True`.
+
