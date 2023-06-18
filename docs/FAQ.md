@@ -1,4 +1,5 @@
-#FAQ
+# FAQ
+
 Here we discuss frequent questions that may occur and we found useful along the way.
 
 1- Does FSDP support mixed precision in one FSDP unit? meaning in one FSDP unit some of your parameters are in Fp16/Bf16 and others in FP32.
