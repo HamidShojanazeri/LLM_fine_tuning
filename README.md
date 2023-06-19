@@ -84,11 +84,15 @@ HF [PEFT](https://github.com/huggingface/peft) library provide an easy way of us
 
 Full parameter finetuning has its own advantages, in this method there are multiple strategies that can help,
 
-1- Finetuning on all the layers
-2- Keep most of the layers frozen and only finetune few layer, there are many different techniques here how to choose, freeze/unfreeze layers based on different criteria.
-3-  Keep the pretrained model frozen and only finetune the task head for example the classifier model.
-4- Keep the pretrained model frozen and add few fully connected layers on the top.
+1-  Keep the pretrained model frozen and only finetune the task head for example the classifier model.
 
+
+2- Keep the pretrained model frozen and add few fully connected layers on the top.
+
+
+3- Finetuning on all the layers
+
+Also, you can keep most of the layers frozen and only finetune few layer, there are many different techniques here how to choose, freeze/unfreeze layers based on different criteria.
 
 <div style="display: flex;">
     <img src="docs/feature-based_FN.png" alt="Image 1" width="250" />
