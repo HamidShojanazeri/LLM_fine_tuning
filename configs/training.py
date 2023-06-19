@@ -17,7 +17,6 @@ class train_config:
     mixed_precision: bool=True
     val_batch_size: int=4
     dataset = "grammar_dataset"
-    fp16: bool=False
     micro_batch_size: int=1
     peft_method: str = "lora" # None , llama_adapter, prefix
     use_peft: bool=False
