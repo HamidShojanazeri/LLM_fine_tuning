@@ -89,11 +89,11 @@ Full parameter finetuning has its own advantages, in this method there are multi
 3-  Keep the pretrained model frozen and only finetune the task head for example the classifier model.
 4- Keep the pretrained model frozen and add few fully connected layers on the top.
 
-[ Place holder to add three diagrams]
+
 <div style="display: flex;">
-    <img src="docs/feature-based_FN.png" alt="Image 1" width="300" />
-    <img src="docs/feature-based-FN-2.png" alt="Image 2" width="300" />
-    <img src="docs/full-param-FN.png" alt="Image 3" width="300" />
+    <img src="docs/feature-based_FN.png" alt="Image 1" width="100" />
+    <img src="docs/feature-based-FN-2.png" alt="Image 2" width="100" />
+    <img src="docs/full-param-FN.png" alt="Image 3" width="100" />
 </div>
 
 
