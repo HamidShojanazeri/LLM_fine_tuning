@@ -21,8 +21,10 @@ from peft import (
     set_peft_model_state_dict,
 )
 from transformers import LlamaForCausalLM, LlamaTokenizer
+from torch.distributed.fsdp import StateDictType
 import torch.distributed as dist
 from .memory_utils import MemoryTrace
+import model_checkpointing
 from torch.distributed.fsdp.sharded_grad_scaler import ShardedGradScaler
 scaler = ShardedGradScaler()
 
@@ -34,7 +36,7 @@ def set_tokenizer_params(tokenizer: LlamaTokenizer):
 def byte2mb(x):
     return int(x / 2**20)
 
-def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulation_steps, num_epochs, local_rank, train_config):
+def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulation_steps, num_epochs, local_rank, rank, train_config, eval_dataloader, tokenizer, fsdp_config):
     """
     Trains the model on the given dataloader
     
@@ -47,11 +49,20 @@ def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulatio
         num_epochs: The number of epochs to train for
         local_rank: The rank of the current node in a distributed setting
         train_config: The training configuration
+        eval_dataloader: The dataloader containing the eval data
+        tokenizer: tokenizer used in the eval for decoding the predicitons
     
-    Returns: train_perplexity, train_epoch_loss
+    Returns: results dictionary containing average training and validation perplexity and loss
     """
     # Create a gradient scaler for fp16
     scaler = torch.cuda.amp.GradScaler() if train_config.fp16 else None
+
+    train_prep = []
+    train_loss = []
+    val_prep = []
+    val_loss =[]
+    results = {}
+    best_val_loss = float("inf")
 
     for epoch in range(num_epochs):
         with MemoryTrace() as memtrace:  # track the memory usage
@@ -66,30 +77,20 @@ def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulatio
                 total_loss += loss.detach().float()
                 loss = loss / gradient_accumulation_steps
                 
-                if train_config.fp16:
+                if train_config.use_fp16:
                     # if fp16 is enabled, use gradient scaler to handle gradient update
                     scaler.scale(loss).backward()
-                    scaler.step(optimizer)
-                    scaler.update()
+                    if (step + 1) % gradient_accumulation_steps == 0 or step == len(train_dataloader) - 1:
+                        scaler.step(optimizer)
+                        scaler.update()
+                        optimizer.zero_grad()
                 else:
                     # regular backpropagation when fp16 is not used
                     loss.backward()
-
-                if (step + 1) % gradient_accumulation_steps == 0 or step == len(train_dataloader) - 1:
-                    # perform optimization step if enough gradients have been accumulated
-                    optimizer.step()
-                    lr_scheduler.step()
-                    optimizer.zero_grad()
-
-        #Printing the GPU and CPU memory usage details
-        print("GPU Memory before entering the train : {}".format(byte2mb(memtrace.begin)))
-        print("GPU Memory consumed at the end of the train (end-begin): {}".format(memtrace.used))
-        print("GPU Peak Memory consumed during the train (max-begin): {}".format(memtrace.peaked))
-        print("GPU Total Peak Memory consumed during the train (max): {}".format(memtrace.peaked + byte2mb(memtrace.begin)))
-        print("CPU Memory before entering the train : {}".format(byte2mb(memtrace.cpu_begin)))
-        print("CPU Memory consumed at the end of the train (end-begin): {}".format(memtrace.cpu_used))
-        print("CPU Peak Memory consumed during the train (max-begin): {}".format(memtrace.cpu_peaked))
-        print("CPU Total Peak Memory consumed during the train (max): {}".format(memtrace.cpu_peaked + byte2mb(memtrace.cpu_begin)))
+                    if (step + 1) % gradient_accumulation_steps == 0 or step == len(train_dataloader) - 1:
+                        optimizer.step()
+                        lr_scheduler.step()
+                        optimizer.zero_grad()
 
         # Reducing total_loss across all devices if there's more than one CUDA device
         if torch.cuda.device_count() > 1:
@@ -98,10 +99,50 @@ def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulatio
         train_epoch_loss = total_loss / len(train_dataloader)
         train_perplexity = torch.exp(train_epoch_loss)
         
-        print(f"Epoch {epoch+1}: train_perplexity={train_perplexity:.4f}, train_epoch_loss={train_epoch_loss:.4f}")
-        return train_perplexity, train_epoch_loss
+        train_prep.append(train_perplexity)
+        train_loss.append(train_epoch_loss)
 
-   
+        if train_config.run_validation:
+            eval_ppl, eval_epoch_loss = evaluation(model, eval_dataloader, rank, tokenizer)
+            if local_rank == 0 and eval_epoch_loss < best_val_loss:
+                best_val_loss = eval_epoch_loss
+                print(f"best eval loss on epoch {epoch} is {best_val_loss}")
+                val_loss.append(best_val_loss)
+                val_prep.append(eval_ppl)
+                
+            if train_config.save_model and eval_epoch_loss < best_val_loss:
+                
+                if not train_config.use_fsdp:
+                    model.save_pretrained(train_config.output_dir)   
+            
+                if fsdp_config.checkpoint_type == StateDictType.FULL_STATE_DICT:
+                    model_checkpointing.save_model_checkpoint(
+                        model, optimizer, rank, fsdp_config, epoch=1
+                    )
+                elif fsdp_config.checkpoint_type == StateDictType.SHARDED_STATE_DICT:
+                    model_checkpointing.save_model_and_optimizer_sharded(model, rank, fsdp_config)
+                    if fsdp_config.save_optimizer:
+                        model_checkpointing.save_model_and_optimizer_sharded(model, rank, fsdp_config, optim=optimizer)
+
+                if fsdp_config.save_optimizer:
+                    model_checkpointing.save_optimizer_checkpoint(
+                        model, optimizer, rank, fsdp_config, epoch=1
+                    )           
+
+        print(f"Epoch {epoch+1}: train_perplexity={train_perplexity:.4f}, train_epoch_loss={train_epoch_loss:.4f}")
+
+    avg_train_prep = sum(train_prep)/len(train_prep)
+    avg_train_loss = sum(train_loss)/len(train_loss)
+    avg_eval_prep = sum(val_prep)/len(val_prep) if val_prep else float('inf')  # to handle case when validation is not run
+    avg_eval_loss = sum(val_loss)/len(val_loss) if val_loss else float('inf')  # to handle case when validation is not run
+
+    results['avg_train_prep'] = avg_train_prep
+    results['avg_train_loss'] = avg_train_loss
+    results['avg_eval_prep'] = avg_eval_prep
+    results['avg_eval_loss'] = avg_eval_loss
+
+    return results
+
 def evaluation(model, eval_dataloader, local_rank, tokenizer):
     """
     Evaluates the model on the given dataloader
