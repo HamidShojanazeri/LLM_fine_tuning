@@ -135,27 +135,29 @@ def main(**kwargs):
     torch.cuda.manual_seed(fsdp_config.seed)
     torch.manual_seed(fsdp_config.seed)
 
-    # torchrun specific
-    local_rank = int(os.environ["LOCAL_RANK"])
-    rank = int(os.environ["RANK"])
-    world_size = int(os.environ["WORLD_SIZE"])
+    if train_config.enable_fsdp:
+        # torchrun specific
+        local_rank = int(os.environ["LOCAL_RANK"])
+        rank = int(os.environ["RANK"])
+        world_size = int(os.environ["WORLD_SIZE"])
 
     gradient_accumulation_steps = train_config.batch_size_training // train_config.micro_batch_size
 
     model = LlamaForCausalLM.from_pretrained(
         train_config.model_name,
         load_in_8bit=True if train_config.quantization else None,
+        device_map="auto" if train_config.quantization else None,   
     )
     if train_config.quantization:
         model = prepare_model_for_int8_training(model)
 
-    if fsdp_config.pure_bf16:
+    if train_config.enable_fsdp and fsdp_config.pure_bf16:
         model.to(torch.bfloat16)
 
-    if rank == 0:
-        parameter_dtypes = get_parameter_dtypes(model)
-        for name, dtype in parameter_dtypes.items():
-            print(f"Parameter '{name}' dtype: {dtype}")
+    # if rank == 0:
+    #     parameter_dtypes = get_parameter_dtypes(model)
+    #     for name, dtype in parameter_dtypes.items():
+    #         print(f"Parameter '{name}' dtype: {dtype}")
 
     tokenizer = LlamaTokenizer.from_pretrained(train_config.model_name)
     tokenizer.add_special_tokens(
@@ -171,8 +173,8 @@ def main(**kwargs):
 
     model = get_peft_model(model, peft_config)
     model.print_trainable_parameters()
-
-    setup()
+    if train_config.enable_fsdp:
+        setup()
 
     if torch.distributed.is_initialized():
         torch.cuda.set_device(rank)
@@ -203,16 +205,18 @@ def main(**kwargs):
         dataset_config,
         split="train",
     )
-    if rank == 0:
-        print(f"--> Training Set Length = {len(dataset_train)}")
+    if train_config.enable_fsdp:
+        if rank == 0:
+            print(f"--> Training Set Length = {len(dataset_train)}")
 
     dataset_val = get_preprocessed_dataset(
         tokenizer,
         dataset_config,
         split="test",
     )
-    if rank == 0:
-        print(f"--> Validation Set Length = {len(dataset_val)}")
+    if train_config.enable_fsdp:
+        if rank == 0:
+            print(f"--> Validation Set Length = {len(dataset_val)}")
 
     train_sampler = None
     val_sampler = None
@@ -270,16 +274,15 @@ def main(**kwargs):
     results = train(
         model,
         train_dataloader,
+        eval_dataloader, 
+        tokenizer,
         optimizer,
         scheduler,
         gradient_accumulation_steps,
-        train_config.num_epochs,
-        local_rank,
-        rank,
         train_config,
-        eval_dataloader, 
-        tokenizer,
-        fsdp_config,
+        fsdp_config if train_config.enable_fsdp else None,
+        local_rank if train_config.enable_fsdp else None,
+        rank if train_config.enable_fsdp else None,
     )
 
 

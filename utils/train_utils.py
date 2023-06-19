@@ -36,7 +36,7 @@ def set_tokenizer_params(tokenizer: LlamaTokenizer):
 def byte2mb(x):
     return int(x / 2**20)
 
-def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulation_steps, num_epochs, local_rank, rank, train_config, eval_dataloader, tokenizer, fsdp_config):
+def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_scheduler, gradient_accumulation_steps, train_config, fsdp_config=None, local_rank=None, rank=None):
     """
     Trains the model on the given dataloader
     
@@ -55,7 +55,7 @@ def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulatio
     Returns: results dictionary containing average training and validation perplexity and loss
     """
     # Create a gradient scaler for fp16
-    scaler = torch.cuda.amp.GradScaler() if train_config.fp16 else None
+    scaler = torch.cuda.amp.GradScaler() if train_config.use_fp16 else None
 
     train_prep = []
     train_loss = []
@@ -64,14 +64,17 @@ def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulatio
     results = {}
     best_val_loss = float("inf")
 
-    for epoch in range(num_epochs):
+    for epoch in range(train_config.num_epochs):
         with MemoryTrace() as memtrace:  # track the memory usage
             model.train()
             total_loss = 0.0
 
             for step, batch in enumerate(tqdm(train_dataloader)):
                 for key in batch.keys():
-                    batch[key] = batch[key].to(local_rank)
+                    if train_config.enable_fsdp:
+                        batch[key] = batch[key].to(local_rank)
+                    else:
+                        batch[key] = batch[key].to('cuda')       
                 outputs = model(**batch)
                 loss = outputs.loss
                 total_loss += loss.detach().float()
@@ -103,7 +106,7 @@ def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulatio
         train_loss.append(train_epoch_loss)
 
         if train_config.run_validation:
-            eval_ppl, eval_epoch_loss = evaluation(model, eval_dataloader, rank, tokenizer)
+            eval_ppl, eval_epoch_loss = evaluation(model, train_config, eval_dataloader, rank, tokenizer)
             if local_rank == 0 and eval_epoch_loss < best_val_loss:
                 best_val_loss = eval_epoch_loss
                 print(f"best eval loss on epoch {epoch} is {best_val_loss}")
@@ -112,22 +115,22 @@ def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulatio
                 
             if train_config.save_model and eval_epoch_loss < best_val_loss:
                 
-                if not train_config.use_fsdp:
+                if not train_config.enable_fsdp:
                     model.save_pretrained(train_config.output_dir)   
-            
-                if fsdp_config.checkpoint_type == StateDictType.FULL_STATE_DICT:
-                    model_checkpointing.save_model_checkpoint(
-                        model, optimizer, rank, fsdp_config, epoch=1
-                    )
-                elif fsdp_config.checkpoint_type == StateDictType.SHARDED_STATE_DICT:
-                    model_checkpointing.save_model_and_optimizer_sharded(model, rank, fsdp_config)
-                    if fsdp_config.save_optimizer:
-                        model_checkpointing.save_model_and_optimizer_sharded(model, rank, fsdp_config, optim=optimizer)
+                else:
+                    if fsdp_config.checkpoint_type == StateDictType.FULL_STATE_DICT:
+                        model_checkpointing.save_model_checkpoint(
+                            model, optimizer, rank, fsdp_config, epoch=1
+                        )
+                    elif fsdp_config.checkpoint_type == StateDictType.SHARDED_STATE_DICT:
+                        model_checkpointing.save_model_and_optimizer_sharded(model, rank, fsdp_config)
+                        if fsdp_config.save_optimizer:
+                            model_checkpointing.save_model_and_optimizer_sharded(model, rank, fsdp_config, optim=optimizer)
 
-                if fsdp_config.save_optimizer:
-                    model_checkpointing.save_optimizer_checkpoint(
-                        model, optimizer, rank, fsdp_config, epoch=1
-                    )           
+                    if fsdp_config.save_optimizer:
+                        model_checkpointing.save_optimizer_checkpoint(
+                            model, optimizer, rank, fsdp_config, epoch=1
+                        )           
 
         print(f"Epoch {epoch+1}: train_perplexity={train_perplexity:.4f}, train_epoch_loss={train_epoch_loss:.4f}")
 
@@ -143,7 +146,7 @@ def train(model, train_dataloader, optimizer, lr_scheduler, gradient_accumulatio
 
     return results
 
-def evaluation(model, eval_dataloader, local_rank, tokenizer):
+def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer):
     """
     Evaluates the model on the given dataloader
     
@@ -162,8 +165,10 @@ def evaluation(model, eval_dataloader, local_rank, tokenizer):
     with MemoryTrace() as memtrace:
         for step, batch in enumerate(tqdm(eval_dataloader)):
             for key in batch.keys():
-                batch[key] = batch[key].to(local_rank)
-                    
+                if train_config.enable_fsdp:
+                    batch[key] = batch[key].to(local_rank)
+                else:
+                    batch[key] = batch[key].to('cuda')
             # Ensure no gradients are computed for this scope to save memory
             with torch.no_grad():
                 # Forward pass and compute loss

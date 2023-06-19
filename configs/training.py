@@ -5,7 +5,7 @@ from typing import ClassVar
 @dataclass
 class train_config:
     model_name: str="decapoda-research/llama-7b-hf"
-    enable_fsdp: bool= True 
+    enable_fsdp: bool= False 
     run_validation: bool=True
     batch_size_training: int=4
     num_epochs: int=3
@@ -27,6 +27,7 @@ class train_config:
     num_freeze_layers: int = 1
     quantization: bool = False
     one_gpu: bool = False
+    save_model: bool = True
     
 
     
