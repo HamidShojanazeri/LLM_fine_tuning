@@ -92,7 +92,7 @@ Full parameter finetuning has its own advantages, in this method there are multi
 
 <div style="display: flex;">
     <img src="docs/feature-based_FN.png" alt="Image 1" width="100" />
-    <img src="docs/feature-based-FN-2.png" alt="Image 2" width="100" />
+    <img src="docs/Feature-based-FN-2.png" alt="Image 2" width="100" />
     <img src="docs/full-param-FN.png" alt="Image 3" width="100" />
 </div>
 
