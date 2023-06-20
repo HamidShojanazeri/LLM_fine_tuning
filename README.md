@@ -23,7 +23,7 @@ Here we use FSDP as discussed in the next section which can be used along with P
 ```bash
 
 pip install -r requirements.txt
-torchrun --nnodes 1 --nproc_per_node 4  fsdp_finetuning.py fsdp_finetuning.py --enable_fsdp --use_peft --peft_method lora
+torchrun --nnodes 1 --nproc_per_node 4  fsdp_finetuning.py --enable_fsdp --use_peft --peft_method lora
 
 ```
 
@@ -41,7 +41,8 @@ torchrun --nnodes 1 --nproc_per_node 4  fsdp_finetuning.py --enable_fsdp --freez
 ```bash
 
 pip install -r requirements.txt
-python fsdp.slurm --num_nodes --num_gpu
+sbatch multi_node.slurm 4  8
+# first arg is num_nodes second arg numb_gpu_per_node
 
 ```
 

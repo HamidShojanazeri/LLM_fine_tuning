@@ -195,6 +195,7 @@ def main(**kwargs):
             device_id=torch.cuda.current_device(),
             limit_all_gathers=False,
         )
+        print(model)
         if fsdp_config.fsdp_activation_checkpointing:
             policies.apply_fsdp_checkpointing(model)
 

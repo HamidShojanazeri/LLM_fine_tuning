@@ -120,16 +120,16 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                 else:
                     if fsdp_config.checkpoint_type == StateDictType.FULL_STATE_DICT:
                         model_checkpointing.save_model_checkpoint(
-                            model, optimizer, rank, fsdp_config, epoch=1
+                            model, optimizer, rank, train_config, epoch=1
                         )
                     elif fsdp_config.checkpoint_type == StateDictType.SHARDED_STATE_DICT:
-                        model_checkpointing.save_model_and_optimizer_sharded(model, rank, fsdp_config)
+                        model_checkpointing.save_model_and_optimizer_sharded(model, rank, train_config)
                         if fsdp_config.save_optimizer:
-                            model_checkpointing.save_model_and_optimizer_sharded(model, rank, fsdp_config, optim=optimizer)
+                            model_checkpointing.save_model_and_optimizer_sharded(model, rank, train_config, optim=optimizer)
 
                     if fsdp_config.save_optimizer:
                         model_checkpointing.save_optimizer_checkpoint(
-                            model, optimizer, rank, fsdp_config, epoch=1
+                            model, optimizer, rank, train_config, epoch=1
                         )           
 
         print(f"Epoch {epoch+1}: train_perplexity={train_perplexity:.4f}, train_epoch_loss={train_epoch_loss:.4f}")
