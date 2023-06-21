@@ -27,9 +27,10 @@ class train_config:
     num_freeze_layers: int = 1
     quantization: bool = False
     one_gpu: bool = False
-    save_model: bool = True
+    save_model: bool = False
     dist_checkpoint_root_folder: str="model_checkpoints"
     dist_checkpoint_folder: str="fine-tuned"
+    save_optimizer: bool=False
 
     
     
