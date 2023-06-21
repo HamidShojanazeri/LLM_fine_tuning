@@ -16,7 +16,7 @@ Get access to a machine with one GPU or if using a multi-GPU macine please make 
 
 ```bash
 pip install -r requirements.txt
-python llama_finetuning.py  --use_peft --peft_method lora --quantization 
+python ../llama_finetuning.py  --use_peft --peft_method lora --quantization 
 
 ```
 The args used in the command above are:
@@ -42,19 +42,19 @@ to run with each of the datasets set the `dataset` flag in the command as shown 
 ```bash
 # grammer_dataset
 
-python llama_finetuning.py  --use_peft --peft_method lora --quantization  --dataset grammar_dataset
+python ../llama_finetuning.py  --use_peft --peft_method lora --quantization  --dataset grammar_dataset
 
 # alpaca_dataset
 
-python llama_finetuning.py  --use_peft --peft_method lora --quantization  --dataset alpaca_dataset
+python ../llama_finetuning.py  --use_peft --peft_method lora --quantization  --dataset alpaca_dataset
 
 # cnn_dailymail_dataset
 
-python llama_finetuning.py  --use_peft --peft_method lora --quantization  --dataset cnn_dailymail_dataset
+python ../llama_finetuning.py  --use_peft --peft_method lora --quantization  --dataset cnn_dailymail_dataset
 
 # samsum_dataset
 
-python llama_finetuning.py  --use_peft --peft_method lora --quantization  --dataset samsum_dataset
+python ../llama_finetuning.py  --use_peft --peft_method lora --quantization  --dataset samsum_dataset
 
 ```
 
