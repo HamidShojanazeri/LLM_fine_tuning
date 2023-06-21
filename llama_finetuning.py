@@ -29,6 +29,12 @@ from utils.train_utils import (
     evaluation,
     freeze_transformer_layers,
     check_frozen_layers_peft_model,
+    setup,
+    setup_environ_flags,
+    cleanup,
+    clear_gpu_cache,
+    get_parameter_dtypes,
+    print_model_size  
 )
 from utils.dataset_utils import (
     get_sharded_datasets,
@@ -70,32 +76,6 @@ verify_bfloat_support = (
 )
 
 
-def setup():
-    """Initialize the process group for distributed training"""
-    dist.init_process_group("nccl")
-
-
-def setup_environ_flags(rank):
-    """Set environment flags for debugging purposes"""
-    os.environ["TORCH_SHOW_CPP_STACKTRACES"] = str(1)
-    os.environ["NCCL_ASYNC_ERROR_HANDLING"] = str(1)
-    os.environ["TORCH_DISTRIBUTED_DEBUG"] = "DETAIL"
-    if rank == 0:
-        print(f"--> Running with torch dist debug set to detail")
-
-
-def cleanup():
-    """Clean up the process group after training"""
-    dist.destroy_process_group()
-
-
-def clear_gpu_cache(rank=None):
-    """Clear the GPU cache for all ranks"""
-    if rank == 0:
-        print(f"Clearing GPU cache for all ranks")
-    torch.cuda.empty_cache()
-
-
 def get_policies(cfg, rank):
     """Get the policies for mixed precision and fsdp wrapping"""
     mixed_precision_policy = None
@@ -119,28 +99,6 @@ def get_policies(cfg, rank):
     return mixed_precision_policy
 
 
-def get_parameter_dtypes(model):
-    """Get the data types of model parameters"""
-    parameter_dtypes = {}
-    for name, parameter in model.named_parameters():
-        parameter_dtypes[name] = parameter.dtype
-    return parameter_dtypes
-
-def print_model_size(model, config, rank: int = 0) -> None:
-    """
-    Print model name, the number of trainable parameters and initialization time.
-
-    Args:
-        model: The PyTorch model.
-        model_name (str): Name of the model.
-        init_time_start (float): Initialization start time.
-        init_time_end (float): Initialization end time.
-        rank (int, optional): Current process's rank. Defaults to 0.
-    """
-    if rank == 0:
-        print(f"--> Model {config.model_name}")
-        total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        print(f"\n--> {config.model_name} has {total_params / 1e6} Million params\n")
 
 
 def main(**kwargs):
