@@ -23,10 +23,13 @@ from peft import (
 from transformers import LlamaForCausalLM, LlamaTokenizer
 from torch.distributed.fsdp import StateDictType
 import torch.distributed as dist
+from pkg_resources import packaging
 from .memory_utils import MemoryTrace
 import model_checkpointing
+import torch.cuda.nccl as nccl
 from torch.distributed.fsdp.sharded_grad_scaler import ShardedGradScaler
 scaler = ShardedGradScaler()
+
 
 def set_tokenizer_params(tokenizer: LlamaTokenizer):
     tokenizer.pad_token_id = 0
@@ -205,3 +208,53 @@ def check_frozen_layers_peft_model(model):
      for i, layer in enumerate(model.base_model.model.model.layers):
             for name, param in layer.named_parameters():
                 print(f"Layer {i}, parameter {name}: requires_grad = {param.requires_grad}")
+                
+                
+def setup():
+    """Initialize the process group for distributed training"""
+    dist.init_process_group("nccl")
+
+
+def setup_environ_flags(rank):
+    """Set environment flags for debugging purposes"""
+    os.environ["TORCH_SHOW_CPP_STACKTRACES"] = str(1)
+    os.environ["NCCL_ASYNC_ERROR_HANDLING"] = str(1)
+    os.environ["TORCH_DISTRIBUTED_DEBUG"] = "DETAIL"
+    if rank == 0:
+        print(f"--> Running with torch dist debug set to detail")
+
+
+def cleanup():
+    """Clean up the process group after training"""
+    dist.destroy_process_group()
+
+
+def clear_gpu_cache(rank=None):
+    """Clear the GPU cache for all ranks"""
+    if rank == 0:
+        print(f"Clearing GPU cache for all ranks")
+    torch.cuda.empty_cache()
+
+
+def get_parameter_dtypes(model):
+    """Get the data types of model parameters"""
+    parameter_dtypes = {}
+    for name, parameter in model.named_parameters():
+        parameter_dtypes[name] = parameter.dtype
+    return parameter_dtypes
+
+def print_model_size(model, config, rank: int = 0) -> None:
+    """
+    Print model name, the number of trainable parameters and initialization time.
+
+    Args:
+        model: The PyTorch model.
+        model_name (str): Name of the model.
+        init_time_start (float): Initialization start time.
+        init_time_end (float): Initialization end time.
+        rank (int, optional): Current process's rank. Defaults to 0.
+    """
+    if rank == 0:
+        print(f"--> Model {config.model_name}")
+        total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print(f"\n--> {config.model_name} has {total_params / 1e6} Million params\n")
