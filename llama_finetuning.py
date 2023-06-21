@@ -34,7 +34,8 @@ from utils.train_utils import (
     cleanup,
     clear_gpu_cache,
     get_parameter_dtypes,
-    print_model_size  
+    print_model_size,
+    get_policies  
 )
 from utils.dataset_utils import (
     get_sharded_datasets,
@@ -66,40 +67,6 @@ import torch.cuda.nccl as nccl
 import torch.distributed as dist
 from transformers.models.t5.modeling_t5 import T5Block
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
-
-verify_bfloat_support = (
-    torch.version.cuda
-    and torch.cuda.is_bf16_supported()
-    and packaging.version.parse(torch.version.cuda).release >= (11, 0)
-    and dist.is_nccl_available()
-    and nccl.version() >= (2, 10)
-)
-
-
-def get_policies(cfg, rank):
-    """Get the policies for mixed precision and fsdp wrapping"""
-    mixed_precision_policy = None
-    wrapping_policy = None
-
-    # Mixed precision
-    if cfg.mixed_precision:
-        bf16_ready = verify_bfloat_support
-
-        if bf16_ready and not cfg.use_fp16:
-            mixed_precision_policy = policies.bfSixteen
-            if rank == 0:
-                print(f"bFloat16 enabled for mixed precision - using bfSixteen policy")
-        elif cfg.use_fp16:
-            mixed_precision_policy = policies.fpSixteen
-            if rank == 0:
-                print(f"FP16 enabled")
-        else:
-            print(f"bFloat16 support not present. Using FP32, and not mixed precision")
-
-    return mixed_precision_policy
-
-
-
 
 def main(**kwargs):
     update_config((train_config, fsdp_config), **kwargs)

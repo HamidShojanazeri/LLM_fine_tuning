@@ -28,7 +28,20 @@ from .memory_utils import MemoryTrace
 import model_checkpointing
 import torch.cuda.nccl as nccl
 from torch.distributed.fsdp.sharded_grad_scaler import ShardedGradScaler
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+from policies import bfSixteen, fpSixteen
+
 scaler = ShardedGradScaler()
+
+verify_bfloat_support = (
+    torch.version.cuda
+    and torch.cuda.is_bf16_supported()
+    and packaging.version.parse(torch.version.cuda).release >= (11, 0)
+    and dist.is_nccl_available()
+    and nccl.version() >= (2, 10)
+)
+
 
 
 def set_tokenizer_params(tokenizer: LlamaTokenizer):
@@ -66,13 +79,12 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
     val_loss =[]
     results = {}
     best_val_loss = float("inf")
-
     for epoch in range(train_config.num_epochs):
         with MemoryTrace() as memtrace:  # track the memory usage
             model.train()
             total_loss = 0.0
 
-            for step, batch in enumerate(tqdm(train_dataloader)):
+            for step, batch in enumerate(tqdm(train_dataloader,colour="blue", desc="Training Epoch")):
                 for key in batch.keys():
                     if train_config.enable_fsdp:
                         batch[key] = batch[key].to(local_rank)
@@ -82,7 +94,6 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                 loss = outputs.loss
                 total_loss += loss.detach().float()
                 loss = loss / gradient_accumulation_steps
-                
                 if train_config.use_fp16:
                     # if fp16 is enabled, use gradient scaler to handle gradient update
                     scaler.scale(loss).backward()
@@ -97,6 +108,8 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                         optimizer.step()
                         lr_scheduler.step()
                         optimizer.zero_grad()
+                        
+                print(f"\n step {step} is completed and loss is {loss.detach().float()}")
 
         # Reducing total_loss across all devices if there's more than one CUDA device
         if torch.cuda.device_count() > 1:
@@ -166,7 +179,7 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer):
     eval_loss = 0.0  # Initialize evaluation loss
     
     with MemoryTrace() as memtrace:
-        for step, batch in enumerate(tqdm(eval_dataloader)):
+        for step, batch in enumerate(tqdm(eval_dataloader,colour="green", desc="evaluating Epoch")):
             for key in batch.keys():
                 if train_config.enable_fsdp:
                     batch[key] = batch[key].to(local_rank)
@@ -258,3 +271,28 @@ def print_model_size(model, config, rank: int = 0) -> None:
         print(f"--> Model {config.model_name}")
         total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         print(f"\n--> {config.model_name} has {total_params / 1e6} Million params\n")
+
+
+
+
+def get_policies(cfg, rank):
+    """Get the policies for mixed precision and fsdp wrapping"""
+    mixed_precision_policy = None
+    wrapping_policy = None
+
+    # Mixed precision
+    if cfg.mixed_precision:
+        bf16_ready = verify_bfloat_support
+
+        if bf16_ready and not cfg.use_fp16:
+            mixed_precision_policy = bfSixteen
+            if rank == 0:
+                print(f"bFloat16 enabled for mixed precision - using bfSixteen policy")
+        elif cfg.use_fp16:
+            mixed_precision_policy = fpSixteen
+            if rank == 0:
+                print(f"FP16 enabled")
+        else:
+            print(f"bFloat16 support not present. Using FP32, and not mixed precision")
+
+    return mixed_precision_policy
