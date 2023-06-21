@@ -11,6 +11,8 @@ Here we make use of Parameter Efficient Methods (PEFT) as described in the next 
 
 **Note** if you are running on a machine with multiple GPUs please make sure to only make one of them visible using `export CUDA_VISIBLE_DEVICES=GPU:id`
 
+**To save the model make sure you set [save_model](configs/training.py).**
+
 ```bash
 pip install -r requirements.txt
 python llama_finetuning.py  --use_peft --peft_method lora --quantization 
