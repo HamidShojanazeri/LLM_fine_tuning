@@ -1,7 +1,13 @@
 
-## Quick Start [WIP]
+## Quick Start
 
-Want to test quickly? run the follwin on one consumer grade GPU, A10, T4, V100, etc.
+**For more details checkout our following examples:**
+
+* [single GPU](./examples/single_gpu.md)
+* [multi-GPU](./examples/mutli_gpu.md) 
+
+
+Want to test quickly? run the follwing on one consumer grade GPU, A10, T4, V100, etc.
 
 **Note** in all command below to change the dataset please pass `dataset` arg, current options for dataset are `grammar_dataset`, `alpaca_dataset`, and `cnn_dailymail_dataset`.
 
@@ -20,7 +26,7 @@ python llama_finetuning.py  --use_peft --peft_method lora --quantization
 ```
 
 
-**Multi GPU One Node**:
+**Multiple GPUs One Node**:
 
 Here we use FSDP as discussed in the next section which can be used along with PEFT methods. To make use of PEFT methods with FSDP make sure to pass `use_peft` amd `peft_method` args along with `enable_fsdp`.
 
