@@ -1,8 +1,5 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+# This software may be used and distributed according to the terms of the GNU General Public License version 3.
 
 # AnyPrecisionAdamW: a flexible precision AdamW optimizer
 # with optional Kahan summation for high precision weight updates.

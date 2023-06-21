@@ -1,3 +1,6 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# This software may be used and distributed according to the terms of the GNU General Public License version 3.
+
 def fsdp_auto_wrap_policy(model, transformer_layer_name):
     import functools
     import os

@@ -1,5 +1,5 @@
-# holds various wrapping policies for fsdp
-
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# This software may be used and distributed according to the terms of the GNU General Public License version 3.
 
 import torch.distributed as dist
 import torch.nn as nn
