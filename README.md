@@ -9,9 +9,11 @@ Want to test quickly? run the follwin on one consumer grade GPU, A10, T4, V100, 
 
 Here we make use of Parameter Efficient Methods (PEFT) as described in the next section. To run the command below make sure to pass the `peft_method` arg which can be set to `lora`, `llama_adapter`, `prefix`.
 
+**Note** if you are running on a machine with multiple GPUs please make sure to only make one of them visible using `export CUDA_VISIBLE_DEVICES=GPU:id`
+
 ```bash
 pip install -r requirements.txt
-python fsdp_finetuning.py  --use_peft --peft_method lora --quantization 
+python llama_finetuning.py.py  --use_peft --peft_method lora --quantization 
 
 ```
 
@@ -23,7 +25,7 @@ Here we use FSDP as discussed in the next section which can be used along with P
 ```bash
 
 pip install -r requirements.txt
-torchrun --nnodes 1 --nproc_per_node 4  fsdp_finetuning.py --enable_fsdp --use_peft --peft_method lora
+torchrun --nnodes 1 --nproc_per_node 4  llama_finetuning.py.py --enable_fsdp --use_peft --peft_method lora
 
 ```
 
@@ -32,7 +34,7 @@ If interested to run full/ partial parameter finetuning without making use of PE
 ```bash
 
 pip install -r requirements.txt
-torchrun --nnodes 1 --nproc_per_node 4  fsdp_finetuning.py --enable_fsdp --freeze_layers --num_freeze_layers 30
+torchrun --nnodes 1 --nproc_per_node 4  llama_finetuning.py.py --enable_fsdp --freeze_layers --num_freeze_layers 30
 
 ```
 
@@ -51,9 +53,9 @@ sbatch multi_node.slurm 4  8
 The [inference script](inference.py) takes the same parameters as defined in the [configs/train_config.py](configs/train_config.py) file and runs the model on a single example.
  The example can either piped through standard input or through the parameter --prompt_file
  ```bash
- cat test_prompt.txt | python inference.py --model_name llama2/model_cpkt
+ cat test_prompt.txt | python inference/inference.py --model_name llama2/model_cpkt
 # or
-python inference.py --model_name llama2/model_cpkt --prompt_file test_prompt.txt
+python inference/inference.py --model_name llama2/model_cpkt --prompt_file test_prompt.txt
  ``` 
 
 Want to read more on our Finetuning strategies here, keep reading.
