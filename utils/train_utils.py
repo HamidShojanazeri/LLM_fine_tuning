@@ -124,10 +124,10 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                         )
                     elif fsdp_config.checkpoint_type == StateDictType.SHARDED_STATE_DICT:
                         model_checkpointing.save_model_and_optimizer_sharded(model, rank, train_config)
-                        if fsdp_config.save_optimizer:
+                        if train_config.save_optimizer:
                             model_checkpointing.save_model_and_optimizer_sharded(model, rank, train_config, optim=optimizer)
 
-                    if fsdp_config.save_optimizer:
+                    if train_config.save_optimizer:
                         model_checkpointing.save_optimizer_checkpoint(
                             model, optimizer, rank, train_config, epoch=1
                         )           
