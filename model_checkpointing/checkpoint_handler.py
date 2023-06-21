@@ -127,16 +127,11 @@ def save_model_checkpoint(
 ):
     """saving model via rank0 cpu streaming and full_state_dict"""
 
-    # saving with rank0 cpu
-    if not cfg.checkpoint_type == StateDictType.FULL_STATE_DICT:
-        print(f" unable to handle checkpoint type {cfg.checkpoint_type}, aborting")
-
     with FSDP.state_dict_type(
         model, StateDictType.FULL_STATE_DICT, fullstate_save_policy
     ):
         cpu_state = model.state_dict()
 
-    if cfg.verbose:
         print(f"saving process: rank {rank}  done w model state_dict\n")
    
 
@@ -145,7 +140,7 @@ def save_model_checkpoint(
         # create save path
         save_dir = Path.cwd() / cfg.checkpoint_folder
         save_dir.mkdir(parents=True, exist_ok=True)
-        save_name = cfg.model_save_name + "-" + str(epoch) + ".pt"
+        save_name = cfg.model_name + "-" + str(epoch) + ".pt"
         save_full_path = str(save_dir) + "/" + save_name
 
         # save model
@@ -186,8 +181,8 @@ def load_model_checkpoint(model, rank, cfg, verbose=True):
 def save_optimizer_checkpoint(model, optimizer, rank, cfg, epoch=1):
     """save optimizer state via full state dict"""
 
-    if cfg.verbose:
-        print(f"--> optim state call on rank {rank}\n")
+   
+    print(f"--> optim state call on rank {rank}\n")
 
     # pull all sharded optimizer states to rank0 cpu...
 
@@ -201,7 +196,7 @@ def save_optimizer_checkpoint(model, optimizer, rank, cfg, epoch=1):
         save_dir.mkdir(parents=True, exist_ok=True)
 
         opt_save_name = (
-            cfg.optimizer_name + "-" + cfg.model_save_name + "-" + str(epoch) + ".pt"
+            cfg.optimizer_name + "-" + cfg.model_name + "-" + str(epoch) + ".pt"
         )
         opt_save_full_path = save_dir / opt_save_name
 
