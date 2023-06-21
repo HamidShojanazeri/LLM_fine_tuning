@@ -13,7 +13,7 @@ Here we make use of Parameter Efficient Methods (PEFT) as described in the next 
 
 ```bash
 pip install -r requirements.txt
-python llama_finetuning.py.py  --use_peft --peft_method lora --quantization 
+python llama_finetuning.py  --use_peft --peft_method lora --quantization 
 
 ```
 
@@ -25,7 +25,7 @@ Here we use FSDP as discussed in the next section which can be used along with P
 ```bash
 
 pip install -r requirements.txt
-torchrun --nnodes 1 --nproc_per_node 4  llama_finetuning.py.py --enable_fsdp --use_peft --peft_method lora
+torchrun --nnodes 1 --nproc_per_node 4  llama_finetuning.py --enable_fsdp --use_peft --peft_method lora
 
 ```
 
@@ -34,7 +34,7 @@ If interested to run full/ partial parameter finetuning without making use of PE
 ```bash
 
 pip install -r requirements.txt
-torchrun --nnodes 1 --nproc_per_node 4  llama_finetuning.py.py --enable_fsdp --freeze_layers --num_freeze_layers 30
+torchrun --nnodes 1 --nproc_per_node 4  llama_finetuning.py --enable_fsdp --freeze_layers --num_freeze_layers 30
 
 ```
 
