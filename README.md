@@ -69,7 +69,7 @@ python inference/inference.py --model_name llama2/model_cpkt --prompt_file test_
 Want to read more on our Finetuning strategies here, keep reading.
 
 
-## LLM_fine_tuning
+## LLM fine_tuning
 
 Here we discuss finetuning LLaMA with couple of different recipes. We will cover two scenarios here:
 
