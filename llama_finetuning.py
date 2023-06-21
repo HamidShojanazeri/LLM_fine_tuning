@@ -202,7 +202,7 @@ def main(**kwargs):
         model = FSDP(
             model,
             auto_wrap_policy=my_auto_wrapping_policy,
-            mixed_precision=mp_policy,
+            mixed_precision=mp_policy if not fsdp_config.pure_bf16 else None,
             sharding_strategy=fsdp_config.sharding_strategy,
             device_id=torch.cuda.current_device(),
             limit_all_gathers=False,
@@ -267,7 +267,7 @@ def main(**kwargs):
             collate_fn=default_data_collator,
         )
 
-    if fsdp_config.optimizer == "anyprecision":
+    if fsdp_config.pure_bf16 and fsdp_config.optimizer == "anyprecision":
         optimizer = AnyPrecisionAdamW(
             model.parameters(),
             lr=train_config.lr,
