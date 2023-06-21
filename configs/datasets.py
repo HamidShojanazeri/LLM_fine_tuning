@@ -3,8 +3,14 @@ from dataclasses import dataclass
 @dataclass
 class cnn_dailymail_dataset:
     dataset: str =  "cnn_dailymail_dataset"
-    train_split: str = "train[0:100]"
-    test_split: str = "validation[0:100]"
+    train_split: str = "train"
+    test_split: str = "validation"
+    
+@dataclass
+class samsum_dataset:
+    dataset: str =  "samsum_dataset"
+    train_split: str = "train"
+    test_split: str = "validation"
     
 @dataclass
 class grammar_dataset:

@@ -11,7 +11,7 @@ from utils.generation_utils import generate_and_tokenize_prompt
 from typing import Optional
 
 
-VALID_DATASET = ["alpaca_dataset", "cnn_dailymail_dataset", "grammar_dataset"]
+VALID_DATASET = ["alpaca_dataset", "cnn_dailymail_dataset", "grammar_dataset", "samsum_dataset"]
 
 
 def get_sharded_datasets(
@@ -63,28 +63,7 @@ def get_sharded_datasets(
     return train_data, val_data
 
 
-residual = {"input_ids": [], "attention_mask": []}
-
-
-def _get_preprocessed_cnn_dailymail(tokenizer, split):
-    dataset = datasets.load_dataset("cnn_dailymail", "3.0.0", split=split)
-
-    prompt = (
-        f"Summarize this article:\n{{article}}\n---\nSummary:\n{{summary}}{{eos_token}}"
-    )
-
-    def apply_prompt_template(sample):
-        return {
-            "text": prompt.format(
-                article=sample["article"],
-                summary=sample["highlights"],
-                eos_token=tokenizer.eos_token,
-            )
-        }
-
-    dataset = dataset.map(apply_prompt_template, remove_columns=list(dataset.features))
-
-    def concatenate_batches(batch, chunk_size=512):
+def concatenate_batches(batch, chunk_size=2048):
         global residual
         concatenated_samples = residual
         concatenated_samples = {
@@ -114,6 +93,57 @@ def _get_preprocessed_cnn_dailymail(tokenizer, split):
 
         return result
 
+
+def _get_preprocessed_cnn_dailymail(tokenizer, split):
+    dataset = datasets.load_dataset("cnn_dailymail", "3.0.0", split=split)
+
+    prompt = (
+        f"Summarize this article:\n{{article}}\n---\nSummary:\n{{summary}}{{eos_token}}"
+    )
+
+    def apply_prompt_template(sample):
+        return {
+            "text": prompt.format(
+                article=sample["article"],
+                summary=sample["highlights"],
+                eos_token=tokenizer.eos_token,
+            )
+        }
+
+    dataset = dataset.map(apply_prompt_template, remove_columns=list(dataset.features))
+    
+    global residual
+    residual = {"input_ids": [], "attention_mask": []}
+    
+    dataset = dataset.map(
+        lambda sample: tokenizer(sample["text"]),
+        batched=True,
+        remove_columns=list(dataset.features),
+    ).map(concatenate_batches, batched=True)
+    return dataset
+
+
+def _get_preprocessed_samsum(tokenizer, split):
+    dataset = datasets.load_dataset("samsum", split=split)
+
+    prompt = (
+        f"Summarize this dialog:\n{{dialog}}\n---\nSummary:\n{{summary}}{{eos_token}}"
+    )
+
+    def apply_prompt_template(sample):
+        return {
+            "text": prompt.format(
+                dialog=sample["dialogue"],
+                summary=sample["summary"],
+                eos_token=tokenizer.eos_token,
+            )
+        }
+
+    dataset = dataset.map(apply_prompt_template, remove_columns=list(dataset.features))
+    
+    global residual
+    residual = {"input_ids": [], "attention_mask": []}
+    
     dataset = dataset.map(
         lambda sample: tokenizer(sample["text"]),
         batched=True,
@@ -136,7 +166,10 @@ def get_preprocessed_dataset(
         )
 
     if dataset_config.dataset == "cnn_dailymail_dataset":
-        return _get_preprocessed_cnn_dailymail(tokenizer, dataset_config.train_split)
+        return _get_preprocessed_cnn_dailymail(tokenizer, get_split())
+    
+    if dataset_config.dataset == "samsum_dataset":
+        return _get_preprocessed_samsum(tokenizer, get_split())
 
     elif dataset_config.dataset == "grammar_dataset":
         return grammar_dataset.get_dataset(
