@@ -83,6 +83,7 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
         with MemoryTrace() as memtrace:  # track the memory usage
             model.train()
             total_loss = 0.0
+            data_set_len = 0
 
             for step, batch in enumerate(tqdm(train_dataloader,colour="blue", desc="Training Epoch")):
                 for key in batch.keys():
@@ -93,6 +94,8 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                 outputs = model(**batch)
                 loss = outputs.loss
                 total_loss += loss.detach().float()
+                first_key = next(iter(batch))
+                data_set_len += len(batch[first_key])
                 loss = loss / gradient_accumulation_steps
                 if train_config.use_fp16:
                     # if fp16 is enabled, use gradient scaler to handle gradient update
@@ -114,8 +117,7 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
         # Reducing total_loss across all devices if there's more than one CUDA device
         if torch.cuda.device_count() > 1:
             dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
-        
-        train_epoch_loss = total_loss / len(train_dataloader)
+        train_epoch_loss = total_loss / data_set_len
         train_perplexity = torch.exp(train_epoch_loss)
         
         train_prep.append(train_perplexity)
@@ -177,7 +179,7 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer):
     model.eval()
     eval_preds = []
     eval_loss = 0.0  # Initialize evaluation loss
-    
+    eval_dataset_len = 0
     with MemoryTrace() as memtrace:
         for step, batch in enumerate(tqdm(eval_dataloader,colour="green", desc="evaluating Epoch")):
             for key in batch.keys():
@@ -191,6 +193,8 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer):
                 outputs = model(**batch)
                 loss = outputs.loss
                 eval_loss += loss.detach().float()
+                first_key = next(iter(batch))
+                eval_dataset_len+= len(batch[first_key])
                 
             # Decode predictions and add to evaluation predictions list
             preds = torch.argmax(outputs.logits, -1)
@@ -203,7 +207,7 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer):
         dist.all_reduce(eval_loss, op=dist.ReduceOp.SUM)
     
     # Compute average loss and perplexity
-    eval_epoch_loss = eval_loss / len(eval_dataloader)
+    eval_epoch_loss = eval_loss / eval_dataset_len
     eval_ppl = torch.exp(eval_epoch_loss)
     
     # Print evaluation metrics
