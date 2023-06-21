@@ -47,10 +47,10 @@ from torch.distributed.fsdp import (
     MixedPrecision,
     StateDictType,
 )
-from anyprecision_optimizer import AnyPrecisionAdamW
 from torch.utils.data import DistributedSampler
 from torch.distributed.fsdp._common_utils import _is_fsdp_flattened
 import policies
+from policies import AnyPrecisionAdamW
 from configs import fsdp_config, train_config
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
@@ -75,15 +75,13 @@ def setup():
     dist.init_process_group("nccl")
 
 
-def setup_environ_flags(cfg, rank):
+def setup_environ_flags(rank):
     """Set environment flags for debugging purposes"""
     os.environ["TORCH_SHOW_CPP_STACKTRACES"] = str(1)
-    if cfg.nccl_debug_handler:
-        os.environ["NCCL_ASYNC_ERROR_HANDLING"] = str(1)
-    if cfg.distributed_debug:
-        os.environ["TORCH_DISTRIBUTED_DEBUG"] = "DETAIL"
-        if rank == 0:
-            print(f"--> Running with torch dist debug set to detail")
+    os.environ["NCCL_ASYNC_ERROR_HANDLING"] = str(1)
+    os.environ["TORCH_DISTRIBUTED_DEBUG"] = "DETAIL"
+    if rank == 0:
+        print(f"--> Running with torch dist debug set to detail")
 
 
 def cleanup():
@@ -128,6 +126,22 @@ def get_parameter_dtypes(model):
         parameter_dtypes[name] = parameter.dtype
     return parameter_dtypes
 
+def print_model_size(model, config, rank: int = 0) -> None:
+    """
+    Print model name, the number of trainable parameters and initialization time.
+
+    Args:
+        model: The PyTorch model.
+        model_name (str): Name of the model.
+        init_time_start (float): Initialization start time.
+        init_time_end (float): Initialization end time.
+        rank (int, optional): Current process's rank. Defaults to 0.
+    """
+    if rank == 0:
+        print(f"--> Model {config.model_name}")
+        total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print(f"\n--> {config.model_name} has {total_params / 1e6} Million params\n")
+
 
 def main(**kwargs):
     update_config((train_config, fsdp_config), **kwargs)
@@ -136,10 +150,16 @@ def main(**kwargs):
     torch.manual_seed(fsdp_config.seed)
 
     if train_config.enable_fsdp:
+        setup()
         # torchrun specific
         local_rank = int(os.environ["LOCAL_RANK"])
         rank = int(os.environ["RANK"])
         world_size = int(os.environ["WORLD_SIZE"])
+
+    if torch.distributed.is_initialized():
+        torch.cuda.set_device(rank)
+        setup_environ_flags(rank)
+    
 
     gradient_accumulation_steps = train_config.batch_size_training // train_config.micro_batch_size
 
@@ -148,16 +168,13 @@ def main(**kwargs):
         load_in_8bit=True if train_config.quantization else None,
         device_map="auto" if train_config.quantization else None,   
     )
+    print_model_size(model, train_config, rank)
+    
     if train_config.quantization:
         model = prepare_model_for_int8_training(model)
 
     if train_config.enable_fsdp and fsdp_config.pure_bf16:
         model.to(torch.bfloat16)
-
-    # if rank == 0:
-    #     parameter_dtypes = get_parameter_dtypes(model)
-    #     for name, dtype in parameter_dtypes.items():
-    #         print(f"Parameter '{name}' dtype: {dtype}")
 
     tokenizer = LlamaTokenizer.from_pretrained(train_config.model_name)
     tokenizer.add_special_tokens(
@@ -173,11 +190,6 @@ def main(**kwargs):
 
     model = get_peft_model(model, peft_config)
     model.print_trainable_parameters()
-    if train_config.enable_fsdp:
-        setup()
-
-    if torch.distributed.is_initialized():
-        torch.cuda.set_device(rank)
 
     if train_config.enable_fsdp:
         if not train_config.use_peft and train_config.freeze_layers:
