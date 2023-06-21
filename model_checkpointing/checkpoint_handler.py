@@ -57,7 +57,8 @@ def load_model_sharded(model, rank, cfg, verbose=True):
         if rank == 0:
             print(f"No sharded_state_dict checkpoint directory found...skipping")
         return
-
+    if rank == 0:
+         print(f"loading model from model path: {load_dir} ")
     reader = FileSystemReader(load_dir)
 
     with FSDP.state_dict_type(model, StateDictType.SHARDED_STATE_DICT):
