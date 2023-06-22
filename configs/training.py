@@ -22,14 +22,12 @@ class train_config:
     micro_batch_size: int=1
     peft_method: str = "lora" # None , llama_adapter, prefix
     use_peft: bool=False
-    model_path: str=""
-    data_path: str = "path to alpaca data json file"
     output_dir: str = "./ft-output"
     freeze_layers: bool = False
     num_freeze_layers: int = 1
     quantization: bool = False
     one_gpu: bool = False
-    save_model: bool = False
+    save_model: bool = True
     dist_checkpoint_root_folder: str="model_checkpoints"
     dist_checkpoint_folder: str="fine-tuned"
     save_optimizer: bool=False
