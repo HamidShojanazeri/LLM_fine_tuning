@@ -72,8 +72,10 @@ from transformers.models.t5.modeling_t5 import T5Block
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 
 def main(**kwargs):
+    # Update the configuration for the training and sharding process
     update_config((train_config, fsdp_config), **kwargs)
 
+    # Set the seeds for reproducibility
     torch.cuda.manual_seed(fsdp_config.seed)
     torch.manual_seed(fsdp_config.seed)
 
@@ -88,22 +90,27 @@ def main(**kwargs):
         torch.cuda.set_device(rank)
         setup_environ_flags(rank)
     
-
+    # Calculate gradient accumulation steps
     gradient_accumulation_steps = train_config.batch_size_training // train_config.micro_batch_size
-
+   
+    # Load the pre-trained model and setup its configuration
     model = LlamaForCausalLM.from_pretrained(
         train_config.model_name,
         load_in_8bit=True if train_config.quantization else None,
         device_map="auto" if train_config.quantization else None,   
     )
+    
     print_model_size(model, train_config, rank)
     
+    # Prepare the model for int8 training if quantization is enabled
     if train_config.quantization:
         model = prepare_model_for_int8_training(model)
-
+        
+    # Convert the model to bfloat16 if fsdp and pure_bf16 is enabled
     if train_config.enable_fsdp and fsdp_config.pure_bf16:
         model.to(torch.bfloat16)
 
+    # Load the tokenizer and add special tokens
     tokenizer = LlamaTokenizer.from_pretrained(train_config.model_name)
     tokenizer.add_special_tokens(
         {
@@ -118,7 +125,8 @@ def main(**kwargs):
 
     model = get_peft_model(model, peft_config)
     model.print_trainable_parameters()
-
+    
+    #setting up FSDP if enable_fsdp is enabled
     if train_config.enable_fsdp:
         if not train_config.use_peft and train_config.freeze_layers:
             
@@ -139,7 +147,8 @@ def main(**kwargs):
             policies.apply_fsdp_checkpointing(model)
 
     dataset_config = generate_dataset_config(train_config, kwargs)
-
+    
+     # Load and preprocess the dataset for training and validation
     dataset_train = get_preprocessed_dataset(
         tokenizer,
         dataset_config,
@@ -173,7 +182,8 @@ def main(**kwargs):
                 rank=dist.get_rank(),
                 num_replicas=dist.get_world_size(),
             )
-
+        
+    # Create DataLoaders for the training and validation dataset
     train_dataloader = torch.utils.data.DataLoader(
         dataset_train,
         batch_size=train_config.batch_size_training,
@@ -194,7 +204,8 @@ def main(**kwargs):
             drop_last=True,
             collate_fn=default_data_collator,
         )
-
+        
+    # Initialize the optimizer and learning rate scheduler
     if fsdp_config.pure_bf16 and fsdp_config.optimizer == "anyprecision":
         optimizer = AnyPrecisionAdamW(
             model.parameters(),
@@ -211,6 +222,7 @@ def main(**kwargs):
         )
     scheduler = StepLR(optimizer, step_size=1, gamma=train_config.gamma)
 
+    # Start the training process
     results = train(
         model,
         train_dataloader,
@@ -224,7 +236,7 @@ def main(**kwargs):
         local_rank if train_config.enable_fsdp else None,
         rank if train_config.enable_fsdp else None,
     )
-
+    [print(f'Key: {k}, Value: {v}') for k, v in results.items()]
 
 if __name__ == "__main__":
     fire.Fire(main)
