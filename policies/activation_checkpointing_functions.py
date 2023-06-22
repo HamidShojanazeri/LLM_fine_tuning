@@ -16,7 +16,6 @@ from functools import partial
 
 non_reentrant_wrapper = partial(
     checkpoint_wrapper,
-    offload_to_cpu=False,
     checkpoint_impl=CheckpointImpl.NO_REENTRANT,
 )
 
