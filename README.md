@@ -58,19 +58,25 @@ sbatch multi_node.slurm 4  8
 
 **Inference**:
 
-The [inference script](inference.py) takes the same parameters as defined in the [configs/train_config.py](configs/train_config.py) file and runs the model on a single example.
- The example can either piped through standard input or through the parameter --prompt_file
+Depending on the type of fine tuning performed during training the [inference script](inference.py) takes different arguements.
+For a fine tuning of all model parameters the output dir of the training has to be given as --model_name argument.
+In case a parameter efficient method like lora the base model has to be given as --model_name and the output dir of the training has to be given as --peft_model argument.
+Additionally, a prompt for the model in form of a text file has to be provided. The prompt file can either be piped through standard input or given as --prompt_file parameter.
+
+Examples:
  ```bash
- cat <test_prompt_file> | python inference/inference.py --model_name llama2/model_cpkt
-# or
-python inference/inference.py --model_name llama2/model_cpkt --prompt_file <test_prompt_file>
+# Full fine tuning of all parameters
+cat <test_prompt_file> | python inference/inference.py --model_name <training_config.output_dir>
+# PEFT method
+cat <test_prompt_file> | python inference/inference.py --model_name <training_config.model_name> --peft_model <training_config.output_dir>
+# prompt as parameter
+python inference/inference.py --model_name <training_config.output_dir> --prompt_file <test_prompt_file>
  ``` 
 The inference folder contains test prompts for three of the integrated datasets:
 ```
 inference/cnn_dailymail_prompt.txt
 ...
 ```
-
 
 Want to read more on our Finetuning strategies here, keep reading.
 
