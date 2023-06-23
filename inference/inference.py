@@ -13,20 +13,11 @@ from transformers import (
     LlamaForCausalLM
 )
 
-from configs import train_config
-from utils.config_utils import update_config
-
-peft_model_id = "ft-output"
+def main(model_name, peft_model=None, quantization=False, max_new_tokens=100, prompt_file=None):
     
-
-def main(**kwargs):
-    update_config(train_config, **kwargs)
-    
-    max_new_tokens = kwargs.get("max_new_tokens", 100)
-    
-    if "prompt_file" in kwargs:
-        assert os.path.exists(kwargs["prompt_file"]), f"Provided Prompt file does not exist {kwargs['prompt_file']}"
-        with open(kwargs["prompt_file"], "r") as f:
+    if prompt_file is not None:
+        assert os.path.exists(prompt_file), f"Provided Prompt file does not exist {prompt_file}"
+        with open(prompt_file, "r") as f:
             user_prompt = '\n'.join(f.readlines())
     elif not sys.stdin.isatty():
         user_prompt = '\n'.join(sys.stdin.readlines())
@@ -35,25 +26,19 @@ def main(**kwargs):
         sys.exit(1)
         
     print(f"User prompt:\n{user_prompt}")
-
-    model_id = (
-        train_config.output_dir
-        if train_config.peft_method is None
-        else train_config.model_name
-    )
     
     model = LlamaForCausalLM.from_pretrained(
-        model_id,
+        model_name,
         return_dict=True,
-        load_in_8bit=train_config.quantization,
+        load_in_8bit=quantization,
         device_map="auto",
     )
 
-    tokenizer = LlamaTokenizer.from_pretrained(model_id)
+    tokenizer = LlamaTokenizer.from_pretrained(model_name)
 
-    if train_config.peft_method:
+    if peft_model:
         # Load the Lora model
-        model = PeftModel.from_pretrained(model, train_config.output_dir)
+        model = PeftModel.from_pretrained(model, peft_model)
 
     model.eval()
 
