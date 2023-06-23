@@ -87,8 +87,8 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
             model.train()
             total_loss = 0.0
             data_set_len = 0
-
-            for step, batch in enumerate(tqdm(train_dataloader,colour="blue", desc="Training Epoch")):
+            
+            for step, batch in enumerate(tqdm(train_dataloader,colour="blue", desc="Training Epoch{epoch}")):
                 for key in batch.keys():
                     if train_config.enable_fsdp:
                         batch[key] = batch[key].to(local_rank)
@@ -96,10 +96,10 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                         batch[key] = batch[key].to('cuda')       
                 outputs = model(**batch)
                 loss = outputs.loss
+                loss = loss / gradient_accumulation_steps
                 total_loss += loss.detach().float()
                 first_key = next(iter(batch))
                 data_set_len += len(batch[first_key])
-                loss = loss / gradient_accumulation_steps
                 if train_config.use_fp16:
                     # if fp16 is enabled, use gradient scaler to handle gradient update
                     scaler.scale(loss).backward()
@@ -140,10 +140,12 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                     model.save_pretrained(train_config.output_dir)   
                 else:
                     if fsdp_config.checkpoint_type == StateDictType.FULL_STATE_DICT:
+                       
                         model_checkpointing.save_model_checkpoint(
                             model, optimizer, rank, train_config, epoch=1
                         )
                     elif fsdp_config.checkpoint_type == StateDictType.SHARDED_STATE_DICT:
+                        
                         model_checkpointing.save_model_and_optimizer_sharded(model, rank, train_config)
                         if train_config.save_optimizer:
                             model_checkpointing.save_model_and_optimizer_sharded(model, rank, train_config, optim=optimizer)
