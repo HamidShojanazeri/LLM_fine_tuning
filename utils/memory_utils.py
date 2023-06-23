@@ -50,6 +50,9 @@ class MemoryTrace:
         torch.cuda.empty_cache()
         self.end = torch.cuda.memory_allocated()
         self.peak = torch.cuda.max_memory_allocated()
+        cuda_info = torch.cuda.memory_stats()
+        self.cuda_malloc_retires = cuda_info.get("num_alloc_retries", 0)
+        self.m_cuda_ooms = cuda_info.get("num_ooms", 0)
         self.used = byte2mb(self.end - self.begin)
         self.peaked = byte2mb(self.peak - self.begin)
 
