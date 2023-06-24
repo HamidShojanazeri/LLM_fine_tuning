@@ -76,8 +76,8 @@ def main(**kwargs):
     update_config((train_config, fsdp_config), **kwargs)
 
     # Set the seeds for reproducibility
-    torch.cuda.manual_seed(fsdp_config.seed)
-    torch.manual_seed(fsdp_config.seed)
+    torch.cuda.manual_seed(train_config.seed)
+    torch.manual_seed(train_config.seed)
 
     if train_config.enable_fsdp:
         setup()
@@ -100,7 +100,7 @@ def main(**kwargs):
         device_map="auto" if train_config.quantization else None,   
     )
     
-    print_model_size(model, train_config, rank)
+    print_model_size(model, train_config, rank if train_config.enable_fsdp else 0)
     
     # Prepare the model for int8 training if quantization is enabled
     if train_config.quantization:
@@ -145,6 +145,8 @@ def main(**kwargs):
         )
         if fsdp_config.fsdp_activation_checkpointing:
             policies.apply_fsdp_checkpointing(model)
+    else:
+        model.to("cuda")
 
     dataset_config = generate_dataset_config(train_config, kwargs)
     
