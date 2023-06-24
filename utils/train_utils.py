@@ -136,7 +136,7 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                 
             if train_config.save_model and eval_epoch_loss < best_val_loss:
                 
-                if not train_config.enable_fsdp:
+                if  train_config.use_peft:
                     model.save_pretrained(train_config.output_dir)   
                 else:
                     if fsdp_config.checkpoint_type == StateDictType.FULL_STATE_DICT:
