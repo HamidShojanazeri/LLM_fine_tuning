@@ -10,7 +10,6 @@ from torch.distributed.fsdp.fully_sharded_data_parallel import StateDictType
 class fsdp_config:
     mixed_precision: bool=True
     use_fp16: bool=False
-    seed: int=42
     sharding_strategy: ShardingStrategy = ShardingStrategy.FULL_SHARD
     checkpoint_type: StateDictType = StateDictType.FULL_STATE_DICT  # alternatively can use SHARDED_STATE_DICT save one file per rank, and can resize the world-size.
     fsdp_activation_checkpointing: bool=True
