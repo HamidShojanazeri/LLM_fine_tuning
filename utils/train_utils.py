@@ -89,6 +89,8 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
             data_set_len = 0
             
             for step, batch in enumerate(tqdm(train_dataloader,colour="blue", desc="Training Epoch{epoch}")):
+                if step>3 :
+                    break
                 for key in batch.keys():
                     if train_config.enable_fsdp:
                         batch[key] = batch[key].to(local_rank)
@@ -137,9 +139,12 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
             if train_config.save_model and eval_epoch_loss < best_val_loss:
                 
                 if  train_config.use_peft:
+                    print(f"we are in the saving the PEFT modules")
                     model.save_pretrained(train_config.output_dir)   
+                    print(f"PEFT modules are saved in {train_config.output_dir} directory")
+                    
                 else:
-                    if fsdp_config.checkpoint_type == StateDictType.FULL_STATE_DICT:
+                    if not train_config.use_peft and fsdp_config.checkpoint_type == StateDictType.FULL_STATE_DICT:
                        
                         model_checkpointing.save_model_checkpoint(
                             model, optimizer, rank, train_config, epoch=1
@@ -187,6 +192,8 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer):
     eval_dataset_len = 0
     with MemoryTrace() as memtrace:
         for step, batch in enumerate(tqdm(eval_dataloader,colour="green", desc="evaluating Epoch")):
+            if step>3 :
+                break
             for key in batch.keys():
                 if train_config.enable_fsdp:
                     batch[key] = batch[key].to(local_rank)
