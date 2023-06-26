@@ -14,7 +14,7 @@ class fsdp_config:
     checkpoint_type: StateDictType = StateDictType.SHARDED_STATE_DICT  # alternatively can use SHARDED_STATE_DICT save one file per rank, and can resize the world-size.
     fsdp_activation_checkpointing: bool=True
     pure_bf16: bool = False
-    optimizer: str= "anyprecision"
+    optimizer: str= "AdamW"
     
     
     
