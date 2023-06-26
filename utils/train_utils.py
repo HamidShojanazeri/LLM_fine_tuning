@@ -33,7 +33,7 @@ import torch.cuda.nccl as nccl
 from torch.distributed.fsdp.sharded_grad_scaler import ShardedGradScaler
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from policies import bfSixteen, fpSixteen, get_llama_wrapper
+from policies import bfSixteen, fpSixteen,bfSixteen_mixed, get_llama_wrapper
 
 scaler = ShardedGradScaler()
 
@@ -301,7 +301,7 @@ def get_policies(cfg, rank):
         bf16_ready = verify_bfloat_support
 
         if bf16_ready and not cfg.use_fp16:
-            mixed_precision_policy = bfSixteen
+            mixed_precision_policy = bfSixteen_mixed
             if rank == 0:
                 print(f"bFloat16 enabled for mixed precision - using bfSixteen policy")
         elif cfg.use_fp16:
