@@ -9,8 +9,8 @@ import numpy as np
 import psutil
 import torch
 
-def byte2mb(x):
-    return int(x / 2**20)
+def byte2gb(x):
+    return int(x / 2**30)
 # This context manager is used to track the peak memory usage of the process
 class MemoryTrace:
     def __enter__(self):
@@ -53,10 +53,10 @@ class MemoryTrace:
         cuda_info = torch.cuda.memory_stats()
         self.cuda_malloc_retires = cuda_info.get("num_alloc_retries", 0)
         self.m_cuda_ooms = cuda_info.get("num_ooms", 0)
-        self.used = byte2mb(self.end - self.begin)
-        self.peaked = byte2mb(self.peak - self.begin)
+        self.used = byte2gb(self.end - self.begin)
+        self.peaked = byte2gb(self.peak - self.begin)
 
         self.cpu_end = self.cpu_mem_used()
-        self.cpu_used = byte2mb(self.cpu_end - self.cpu_begin)
-        self.cpu_peaked = byte2mb(self.cpu_peak - self.cpu_begin)
+        self.cpu_used = byte2gb(self.cpu_end - self.cpu_begin)
+        self.cpu_peaked = byte2gb(self.cpu_peak - self.cpu_begin)
         # print(f"delta used/peak {self.used:4d}/{self.peaked:4d}")
