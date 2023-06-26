@@ -33,7 +33,7 @@ import torch.cuda.nccl as nccl
 from torch.distributed.fsdp.sharded_grad_scaler import ShardedGradScaler
 from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from policies import bfSixteen, fpSixteen
+from policies import bfSixteen, fpSixteen, get_llama_wrapper
 
 scaler = ShardedGradScaler()
 
@@ -122,13 +122,7 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
         train_loss.append(train_epoch_loss)
 
         if train_config.run_validation:
-            eval_ppl, eval_epoch_loss = evaluation(model, train_config, eval_dataloader, rank, tokenizer)
-            if local_rank == 0 and eval_epoch_loss < best_val_loss:
-                best_val_loss = eval_epoch_loss
-                print(f"best eval loss on epoch {epoch} is {best_val_loss}")
-                val_loss.append(best_val_loss)
-                val_prep.append(eval_ppl)
-                
+            eval_ppl, eval_epoch_loss = evaluation(model, train_config, eval_dataloader, rank, tokenizer)   
             if train_config.save_model and eval_epoch_loss < best_val_loss:
                 
                 if  train_config.use_peft:
@@ -138,21 +132,27 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                     
                 else:
                     if not train_config.use_peft and fsdp_config.checkpoint_type == StateDictType.FULL_STATE_DICT:
-                       
+                        
                         model_checkpointing.save_model_checkpoint(
                             model, optimizer, rank, train_config, epoch=1
                         )
-                    elif fsdp_config.checkpoint_type == StateDictType.SHARDED_STATE_DICT:
+                    elif not train_config.use_peft and fsdp_config.checkpoint_type == StateDictType.SHARDED_STATE_DICT:
+                        print(" we are about to save the models *******")
                         
                         model_checkpointing.save_model_and_optimizer_sharded(model, rank, train_config)
                         if train_config.save_optimizer:
                             model_checkpointing.save_model_and_optimizer_sharded(model, rank, train_config, optim=optimizer)
 
-                    if train_config.save_optimizer:
+                    if not train_config.use_peft and  train_config.save_optimizer:
                         model_checkpointing.save_optimizer_checkpoint(
                             model, optimizer, rank, train_config, epoch=1
-                        )           
-
+                        )   
+                                
+            best_val_loss = eval_epoch_loss
+            if local_rank == 0 and eval_epoch_loss < best_val_loss:
+                print(f"best eval loss on epoch {epoch} is {best_val_loss}")
+                val_loss.append(best_val_loss)
+                val_prep.append(eval_ppl)
         print(f"Epoch {epoch+1}: train_perplexity={train_perplexity:.4f}, train_epoch_loss={train_epoch_loss:.4f}")
 
     avg_train_prep = sum(train_prep)/len(train_prep)
@@ -164,6 +164,7 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
     results['avg_train_loss'] = avg_train_loss
     results['avg_eval_prep'] = avg_eval_prep
     results['avg_eval_loss'] = avg_eval_loss
+    
 
     return results
 
@@ -313,5 +314,5 @@ def get_policies(cfg, rank):
                 print(f"FP16 enabled")
         else:
             print(f"bFloat16 support not present. Using FP32, and not mixed precision")
-
-    return mixed_precision_policy
+    wrapping_policy = get_llama_wrapper()
+    return mixed_precision_policy, wrapping_policy

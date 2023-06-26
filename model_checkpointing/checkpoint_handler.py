@@ -82,6 +82,7 @@ def load_model_sharded(model, rank, cfg, verbose=True):
 
 def save_model_and_optimizer_sharded(model, rank, cfg,optim=None, verbose=True):
     """save model and optimizer via sharded_state_dict to save_dir"""
+    
     folder_name = (
         cfg.dist_checkpoint_root_folder
         + "/"
@@ -100,7 +101,7 @@ def save_model_and_optimizer_sharded(model, rank, cfg,optim=None, verbose=True):
     t0 = time.perf_counter()
 
     with FSDP.state_dict_type(model, StateDictType.SHARDED_STATE_DICT):
-
+        
         state_dict = {"model": model.state_dict()}
         if optim is not None:
             state_dict["optim"] = FSDP.optim_state_dict(model, optim)
@@ -116,9 +117,8 @@ def save_model_and_optimizer_sharded(model, rank, cfg,optim=None, verbose=True):
     if rank == 0:
         print(f"Sharded state checkpoint saved to {save_dir}")
         print(
-            f"Checkpoint Time = {t1-t0:.4f}\n using {cfg.save_using_num_threads=} total threads"
+            f"Checkpoint Time = {t1-t0:.4f}\n"
         )
-        
 def save_model_checkpoint(
     model,
     optimizer,

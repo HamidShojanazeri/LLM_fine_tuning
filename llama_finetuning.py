@@ -122,9 +122,8 @@ def main(**kwargs):
     )
     if train_config.use_peft:
         peft_config = generate_peft_config(train_config, kwargs)
-
-    model = get_peft_model(model, peft_config)
-    model.print_trainable_parameters()
+        model = get_peft_model(model, peft_config)
+        model.print_trainable_parameters()
     
     #setting up FSDP if enable_fsdp is enabled
     if train_config.enable_fsdp:
@@ -132,13 +131,13 @@ def main(**kwargs):
             
             freeze_transformer_layers(train_config.num_freeze_layers)
 
-        mp_policy = get_policies(fsdp_config, rank)
+        mixed_precision_policy, wrapping_policy = get_policies(fsdp_config, rank)
         my_auto_wrapping_policy = fsdp_auto_wrap_policy(model, LlamaDecoderLayer)
-        mp_policy = None
+   
         model = FSDP(
             model,
-            auto_wrap_policy=my_auto_wrapping_policy,
-            mixed_precision=mp_policy if not fsdp_config.pure_bf16 else None,
+            auto_wrap_policy= my_auto_wrapping_policy if train_config.use_peft else wrapping_policy,
+            mixed_precision=mixed_precision_policy if not fsdp_config.pure_bf16 else None,
             sharding_strategy=fsdp_config.sharding_strategy,
             device_id=torch.cuda.current_device(),
             limit_all_gathers=False,
@@ -238,7 +237,8 @@ def main(**kwargs):
         local_rank if train_config.enable_fsdp else None,
         rank if train_config.enable_fsdp else None,
     )
-    [print(f'Key: {k}, Value: {v}') for k, v in results.items()]
+    if rank==0:
+        [print(f'Key: {k}, Value: {v}') for k, v in results.items()]
 
 if __name__ == "__main__":
     fire.Fire(main)
