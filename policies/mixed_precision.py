@@ -28,7 +28,7 @@ bfSixteen = MixedPrecision(
     buffer_dtype=torch.bfloat16,
 )
 
-bfSixteen_working = MixedPrecision(
+bfSixteen_mixed = MixedPrecision(
     param_dtype=torch.float32,
     reduce_dtype=torch.bfloat16,
     buffer_dtype=torch.bfloat16,
