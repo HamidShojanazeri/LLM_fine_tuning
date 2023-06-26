@@ -37,12 +37,12 @@ torchrun --nnodes 1 --nproc_per_node 4  llama_finetuning.py --enable_fsdp --use_
 
 ```
 
-If interested to run full/ partial parameter finetuning without making use of PEFT methods. Then use the command below, here we would need an extra args, `freeze_layers` and `num_freeze_layers` that let FSDP know how if need to freeze layer and how many of them needs to be frozen. This would start to freeze layers from the first layer up to the number you specifiy in `num_freeze_layers`. Make sure to change the `nproc_per_node` to your available GPUs.
+If interested to run full parameter finetuning without making use of PEFT methods. Make sure to change the `nproc_per_node` to your available GPUs.
 
 ```bash
 
 pip install -r requirements.txt
-torchrun --nnodes 1 --nproc_per_node 4  llama_finetuning.py --enable_fsdp --freeze_layers --num_freeze_layers 30
+torchrun --nnodes 1 --nproc_per_node 4  llama_finetuning.py --enable_fsdp 
 
 ```
 
