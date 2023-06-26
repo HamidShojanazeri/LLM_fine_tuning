@@ -51,8 +51,8 @@ torchrun --nnodes 1 --nproc_per_node 4  llama_finetuning.py --enable_fsdp --free
 ```bash
 
 pip install -r requirements.txt
-sbatch multi_node.slurm 4  8
-# first arg is num_nodes second arg numb_gpu_per_node
+sbatch multi_node.slurm 
+# Change the num nodes and GPU per nodes in the script before running.
 
 ```
 

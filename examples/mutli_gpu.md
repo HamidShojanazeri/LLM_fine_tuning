@@ -39,8 +39,8 @@ Here we use a slurm script to schedule a job with slurm over multiple nodes.
 ```bash
 
 pip install -r requirements.txt
-sbatch multi_node.slurm 4  8
-# first arg is num_nodes second arg numb_gpu_per_node
+sbatch multi_node.slurm 
+# Change the num nodes and GPU per nodes in the script before running.
 
 ```
 

@@ -37,13 +37,6 @@ from policies import bfSixteen, fpSixteen
 
 scaler = ShardedGradScaler()
 
-verify_bfloat_support = (
-    torch.version.cuda
-    and torch.cuda.is_bf16_supported()
-    and packaging.version.parse(torch.version.cuda).release >= (11, 0)
-    and dist.is_nccl_available()
-    and nccl.version() >= (2, 10)
-)
 
 
 
@@ -293,6 +286,16 @@ def print_model_size(model, config, rank: int = 0) -> None:
 
 def get_policies(cfg, rank):
     """Get the policies for mixed precision and fsdp wrapping"""
+    
+    verify_bfloat_support = (
+    torch.version.cuda
+    and torch.cuda.is_bf16_supported()
+    and packaging.version.parse(torch.version.cuda).release >= (11, 0)
+    and dist.is_nccl_available()
+    and nccl.version() >= (2, 10)
+    )
+
+
     mixed_precision_policy = None
     wrapping_policy = None
 
