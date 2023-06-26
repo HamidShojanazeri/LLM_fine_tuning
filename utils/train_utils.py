@@ -82,8 +82,6 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
             data_set_len = 0
             
             for step, batch in enumerate(tqdm(train_dataloader,colour="blue", desc="Training Epoch{epoch}")):
-                if step>3 :
-                    break
                 for key in batch.keys():
                     if train_config.enable_fsdp:
                         batch[key] = batch[key].to(local_rank)
@@ -186,8 +184,6 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer):
     eval_dataset_len = 0
     with MemoryTrace() as memtrace:
         for step, batch in enumerate(tqdm(eval_dataloader,colour="green", desc="evaluating Epoch")):
-            if step>3 :
-                break
             for key in batch.keys():
                 if train_config.enable_fsdp:
                     batch[key] = batch[key].to(local_rank)
