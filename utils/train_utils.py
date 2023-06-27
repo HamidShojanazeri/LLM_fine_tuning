@@ -118,12 +118,18 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
         
         train_prep.append(train_perplexity)
         train_loss.append(train_epoch_loss)
-
+        if rank ==0:
+            print(f"Max CUDA memory allocated was {memtrace.peak} GB")
+            print(f"Max CUDA memory reserved was {memtrace.max_reserved} GB")
+            print(f"Cuda Malloc retires : {memtrace.cuda_malloc_retires}")
+            print(f"CPU Total Peak Memory consumed during the train (max): {memtrace.cpu_peaked + memtrace.cpu_begin} GB")
+            
         if train_config.run_validation:
             eval_ppl, eval_epoch_loss = evaluation(model, train_config, eval_dataloader, rank, tokenizer)   
             if train_config.save_model and eval_epoch_loss < best_val_loss:
                 
                 if  train_config.use_peft:
+                    
                     print(f"we are in the saving the PEFT modules")
                     model.save_pretrained(train_config.output_dir)   
                     print(f"PEFT modules are saved in {train_config.output_dir} directory")
@@ -151,7 +157,8 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                 print(f"best eval loss on epoch {epoch} is {best_val_loss}")
                 val_loss.append(best_val_loss)
                 val_prep.append(eval_ppl)
-        print(f"Epoch {epoch+1}: train_perplexity={train_perplexity:.4f}, train_epoch_loss={train_epoch_loss:.4f}")
+        if rank==0:
+            print(f"Epoch {epoch+1}: train_perplexity={train_perplexity:.4f}, train_epoch_loss={train_epoch_loss:.4f}")
 
     avg_train_prep = sum(train_prep)/len(train_prep)
     avg_train_loss = sum(train_loss)/len(train_loss)
@@ -160,9 +167,10 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
 
     results['avg_train_prep'] = avg_train_prep
     results['avg_train_loss'] = avg_train_loss
-    results['avg_eval_prep'] = avg_eval_prep
-    results['avg_eval_loss'] = avg_eval_loss
-    
+    if train_config.run_validation:
+        results['avg_eval_prep'] = avg_eval_prep
+        results['avg_eval_loss'] = avg_eval_loss
+        
 
     return results
 
@@ -301,7 +309,7 @@ def get_policies(cfg, rank):
         bf16_ready = verify_bfloat_support
 
         if bf16_ready and not cfg.use_fp16:
-            mixed_precision_policy = bfSixteen
+            mixed_precision_policy = bfSixteen_mixed
             if rank == 0:
                 print(f"bFloat16 enabled for mixed precision - using bfSixteen policy")
         elif cfg.use_fp16:

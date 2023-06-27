@@ -17,10 +17,9 @@ class MemoryTrace:
         gc.collect()
         torch.cuda.empty_cache()
         torch.cuda.reset_max_memory_allocated()  # reset the peak gauge to zero
-        self.begin = torch.cuda.memory_allocated()
+        self.begin = byte2gb(torch.cuda.memory_allocated())
         self.process = psutil.Process()
-
-        self.cpu_begin = self.cpu_mem_used()
+        self.cpu_begin = byte2gb(self.cpu_mem_used())
         self.peak_monitoring = True
         peak_monitor_thread = threading.Thread(target=self.peak_monitor_func)
         peak_monitor_thread.daemon = True
@@ -48,13 +47,14 @@ class MemoryTrace:
 
         gc.collect()
         torch.cuda.empty_cache()
-        self.end = torch.cuda.memory_allocated()
-        self.peak = torch.cuda.max_memory_allocated()
+        self.end = byte2gb(torch.cuda.memory_allocated())
+        self.peak = byte2gb(torch.cuda.max_memory_allocated())
         cuda_info = torch.cuda.memory_stats()
         self.cuda_malloc_retires = cuda_info.get("num_alloc_retries", 0)
         self.m_cuda_ooms = cuda_info.get("num_ooms", 0)
         self.used = byte2gb(self.end - self.begin)
         self.peaked = byte2gb(self.peak - self.begin)
+        self.max_reserved = byte2gb(torch.cuda.max_memory_reserved())
 
         self.cpu_end = self.cpu_mem_used()
         self.cpu_used = byte2gb(self.cpu_end - self.cpu_begin)
