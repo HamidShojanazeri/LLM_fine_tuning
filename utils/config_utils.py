@@ -1,6 +1,7 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # This software may be used and distributed according to the terms of the GNU General Public License version 3.
 
+import inspect
 from dataclasses import fields
 from peft import (
     LoraConfig,
@@ -8,8 +9,9 @@ from peft import (
     PrefixTuningConfig,
 )
 
+import configs.datasets as datasets
 from configs import lora_config, llama_adapter_config, prefix_config, train_config
-from configs.datasets import grammar_dataset, alpaca_dataset, cnn_dailymail_dataset
+from .dataset_utils import DATASET_PREPROC
 
 
 def update_config(config, **kwargs):
@@ -49,12 +51,11 @@ def generate_peft_config(train_config, kwargs):
 
 
 def generate_dataset_config(train_config, kwargs):
-    datasets = (grammar_dataset, alpaca_dataset, cnn_dailymail_dataset)
-    names = tuple(ds.__name__ for ds in datasets)
+    names = tuple(DATASET_PREPROC.keys())
     
     assert train_config.dataset in names, f"Unknown dataset: {train_config.dataset}"
     
-    dataset_config = datasets[names.index(train_config.dataset)]
+    dataset_config = {k:v for k, v in inspect.getmembers(datasets)}[train_config.dataset]
     update_config(dataset_config, **kwargs)
     
     return  dataset_config
