@@ -48,9 +48,16 @@ sbatch multi_node.slurm
 
 Currenty 4 datasets are supported that can be found in [Datasets config file](../configs/datasets.py).
 
-* `grammar_dataset`
-* `alpaca_dataset`
+* `grammar_dataset` : use this [notebook](../ft_datasets/grammar_dataset/grammar_dataset_process.ipynb) to pull and process theJfleg and C4 200M datasets for grammar checking.
+
+* `alpaca_dataset` : to get this open source data please download the `aplaca.json` to `ft_dataset` folder.
+
+```bash
+wget -P ft_dataset https://github.com/tatsu-lab/stanford_alpaca/blob/main/alpaca_data.json
+```
+
 * `cnn_dailymail_dataset`
+
 * `samsum_dataset`
 
 to run with each of the datasets set the `dataset` flag in the command as shown below:
