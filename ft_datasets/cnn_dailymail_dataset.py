@@ -26,5 +26,5 @@ def get_preprocessed_cnn_dailymail(dataset_config, tokenizer, split):
         lambda sample: tokenizer(sample["text"]),
         batched=True,
         remove_columns=list(dataset.features),
-    ).map(Concatenator(), batched=True)
+    ).map(Concatenator(chunk_size=1024), batched=True)
     return dataset
