@@ -115,7 +115,7 @@ class grammar(Dataset):
 
 
 def get_dataset(
-    tokenizer, csv_name=None, num_samples=None, input_length=512, output_length=512
+    _, tokenizer, csv_name=None, num_samples=None, input_length=512
 ):
     """cover function for handling loading the working dataset"""
     """dataset loading"""

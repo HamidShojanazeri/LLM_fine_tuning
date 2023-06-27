@@ -9,7 +9,7 @@
 
 Want to test quickly? run the follwing on one consumer grade GPU, A10, T4, V100, etc.
 
-**Note** in all command below to change the dataset please pass `dataset` arg, current options for dataset are `grammar_dataset`, `alpaca_dataset`, and `cnn_dailymail_dataset`. a description of the datasets can be found in [Dataset.md](./docs/Dataset.md).
+**Note** in all command below to change the dataset please pass `dataset` arg, current options for dataset are `grammar_dataset`, `alpaca_dataset`, and `cnn_dailymail_dataset`. A description of the datasets and how to add custom datasets can be found in [Dataset.md](./docs/Dataset.md).
 
 **One GPU** :
 

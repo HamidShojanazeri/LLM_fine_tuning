@@ -4,16 +4,23 @@ import datasets
 import torch
 
 from functools import partial
-from itertools import chain
 
-
-from ft_datasets import grammar_dataset
-from ft_datasets.alpaca_dataset import InstructionDataset
+from ft_datasets import (
+    get_grammar_dataset,
+    get_alpaca_dataset,
+    get_cnn_dailymail_dataset,
+    get_samsum_dataset,
+)
 from utils.generation_utils import generate_and_tokenize_prompt
 from typing import Optional
 
 
-VALID_DATASET = ["alpaca_dataset", "cnn_dailymail_dataset", "grammar_dataset", "samsum_dataset"]
+DATASET_PREPROC = {
+    "alpaca_dataset": partial(get_alpaca_dataset, max_words=224),
+    "cnn_dailymail_dataset": get_cnn_dailymail_dataset,
+    "grammar_dataset": partial(get_grammar_dataset, num_samples=512, input_length=512),
+    "samsum_dataset": get_samsum_dataset,
+}
 
 
 def get_sharded_datasets(
@@ -65,99 +72,10 @@ def get_sharded_datasets(
     return train_data, val_data
 
 
-def concatenate_batches(batch, chunk_size=2048):
-        global residual
-        concatenated_samples = residual
-        concatenated_samples = {
-            k: v + list(chain(*batch[k])) for k, v in residual.items()
-        }
-
-        total_length = len(concatenated_samples[list(concatenated_samples.keys())[0]])
-
-        if total_length >= chunk_size:
-            chunk_num = total_length // chunk_size
-            result = {
-                k: [
-                    v[i : i + chunk_size]
-                    for i in range(0, chunk_num * chunk_size, chunk_size)
-                ]
-                for k, v in concatenated_samples.items()
-            }
-            residual = {
-                k: v[(chunk_num * chunk_size) :]
-                for k, v in concatenated_samples.items()
-            }
-        else:
-            result = concatenated_samples
-            residual = {k: [] for k in concatenated_samples.keys()}
-
-        result["labels"] = result["input_ids"].copy()
-
-        return result
-
-
-def _get_preprocessed_cnn_dailymail(tokenizer, split):
-    dataset = datasets.load_dataset("cnn_dailymail", "3.0.0", split=split)
-
-    prompt = (
-        f"Summarize this article:\n{{article}}\n---\nSummary:\n{{summary}}{{eos_token}}"
-    )
-
-    def apply_prompt_template(sample):
-        return {
-            "text": prompt.format(
-                article=sample["article"],
-                summary=sample["highlights"],
-                eos_token=tokenizer.eos_token,
-            )
-        }
-
-    dataset = dataset.map(apply_prompt_template, remove_columns=list(dataset.features))
-    
-    global residual
-    residual = {"input_ids": [], "attention_mask": []}
-    
-    dataset = dataset.map(
-        lambda sample: tokenizer(sample["text"]),
-        batched=True,
-        remove_columns=list(dataset.features),
-    ).map(concatenate_batches, batched=True)
-    return dataset
-
-
-def _get_preprocessed_samsum(tokenizer, split):
-    dataset = datasets.load_dataset("samsum", split=split)
-
-    prompt = (
-        f"Summarize this dialog:\n{{dialog}}\n---\nSummary:\n{{summary}}{{eos_token}}"
-    )
-
-    def apply_prompt_template(sample):
-        return {
-            "text": prompt.format(
-                dialog=sample["dialogue"],
-                summary=sample["summary"],
-                eos_token=tokenizer.eos_token,
-            )
-        }
-
-    dataset = dataset.map(apply_prompt_template, remove_columns=list(dataset.features))
-    
-    global residual
-    residual = {"input_ids": [], "attention_mask": []}
-    
-    dataset = dataset.map(
-        lambda sample: tokenizer(sample["text"]),
-        batched=True,
-        remove_columns=list(dataset.features),
-    ).map(concatenate_batches, batched=True)
-    return dataset
-
-
 def get_preprocessed_dataset(
     tokenizer, dataset_config, split: str = "train"
 ) -> torch.utils.data.Dataset:
-    if not dataset_config.dataset in VALID_DATASET:
+    if not dataset_config.dataset in DATASET_PREPROC:
         raise NotImplementedError(f"{dataset_config.dataset} is not (yet) implemented")
 
     def get_split():
@@ -166,26 +84,9 @@ def get_preprocessed_dataset(
             if split == "train"
             else dataset_config.test_split
         )
-
-    if dataset_config.dataset == "cnn_dailymail_dataset":
-        return _get_preprocessed_cnn_dailymail(tokenizer, get_split())
     
-    if dataset_config.dataset == "samsum_dataset":
-        return _get_preprocessed_samsum(tokenizer, get_split())
-
-    elif dataset_config.dataset == "grammar_dataset":
-        return grammar_dataset.get_dataset(
-            tokenizer,
-            get_split(),
-            512,
-            512,
-            True,
-        )
-
-    elif dataset_config.dataset == "alpaca_dataset":
-        return InstructionDataset(
-            data_path=dataset_config.data_path,
-            tokenizer=tokenizer,
-            max_words=224,
-            partition=get_split(),
-        )
+    return DATASET_PREPROC[dataset_config.dataset](
+        dataset_config,
+        tokenizer,
+        get_split(),
+    )
