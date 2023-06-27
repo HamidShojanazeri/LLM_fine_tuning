@@ -33,8 +33,15 @@ The args used in the command above are:
 Currenty 4 datasets are supported that can be found in [Datasets config file](../configs/datasets.py).
 
 * `grammar_dataset`
-* `alpaca_dataset`
+
+* `alpaca_dataset` : to get this open source data please download the `aplaca.json` to `ft_dataset` folder.
+
+```bash
+wget -P ft_dataset https://github.com/tatsu-lab/stanford_alpaca/blob/main/alpaca_data.json
+```
+
 * `cnn_dailymail_dataset`
+
 * `samsum_dataset`
 
 to run with each of the datasets set the `dataset` flag in the command as shown below:
