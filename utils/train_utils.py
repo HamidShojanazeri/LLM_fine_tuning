@@ -118,11 +118,11 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
         
         train_prep.append(train_perplexity)
         train_loss.append(train_epoch_loss)
-        if rank ==0:
-            print(f"Max CUDA memory allocated was {memtrace.peak} GB")
-            print(f"Max CUDA memory reserved was {memtrace.max_reserved} GB")
-            print(f"Cuda Malloc retires : {memtrace.cuda_malloc_retires}")
-            print(f"CPU Total Peak Memory consumed during the train (max): {memtrace.cpu_peaked + memtrace.cpu_begin} GB")
+        
+        print(f"Max CUDA memory allocated was {memtrace.peak} GB")
+        print(f"Max CUDA memory reserved was {memtrace.max_reserved} GB")
+        print(f"Cuda Malloc retires : {memtrace.cuda_malloc_retires}")
+        print(f"CPU Total Peak Memory consumed during the train (max): {memtrace.cpu_peaked + memtrace.cpu_begin} GB")
             
         if train_config.run_validation:
             eval_ppl, eval_epoch_loss = evaluation(model, train_config, eval_dataloader, rank, tokenizer)   
@@ -157,13 +157,13 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                 print(f"best eval loss on epoch {epoch} is {best_val_loss}")
                 val_loss.append(best_val_loss)
                 val_prep.append(eval_ppl)
-        if rank==0:
-            print(f"Epoch {epoch+1}: train_perplexity={train_perplexity:.4f}, train_epoch_loss={train_epoch_loss:.4f}")
+        
+        print(f"Epoch {epoch+1}: train_perplexity={train_perplexity:.4f}, train_epoch_loss={train_epoch_loss:.4f}")
 
     avg_train_prep = sum(train_prep)/len(train_prep)
     avg_train_loss = sum(train_loss)/len(train_loss)
-    avg_eval_prep = sum(val_prep)/len(val_prep) if val_prep else float('inf')  # to handle case when validation is not run
-    avg_eval_loss = sum(val_loss)/len(val_loss) if val_loss else float('inf')  # to handle case when validation is not run
+    avg_eval_prep = sum(val_prep)/len(val_prep) #if val_prep else float('inf')  # to handle case when validation is not run
+    avg_eval_loss = sum(val_loss)/len(val_loss) #if val_loss else float('inf')  # to handle case when validation is not run
 
     results['avg_train_prep'] = avg_train_prep
     results['avg_train_loss'] = avg_train_loss
