@@ -6,24 +6,24 @@ from typing import ClassVar
 
 @dataclass
 class train_config:
-    model_name: str="decapoda-research/llama-7b-hf"
+    model_name: str="PATH/to/LLAMMA/7B"
     enable_fsdp: bool= False 
     run_validation: bool=True
-    batch_size_training: int=4
+    batch_size_training: int=64
     num_epochs: int=3
-    num_workers_dataloader: int=2
-    lr: float=2e-4
+    num_workers_dataloader: int=1
+    lr: float=3e-4
     weight_decay: float=0.0
     gamma: float= 0.85
     seed: int=42
     use_fp16: bool=False
     mixed_precision: bool=True
-    val_batch_size: int=4
-    dataset = "grammar_dataset"
-    micro_batch_size: int=1
+    val_batch_size: int=1
+    dataset = "alpaca_dataset"
+    micro_batch_size: int=4
     peft_method: str = "lora" # None , llama_adapter, prefix
     use_peft: bool=False
-    output_dir: str = "./ft-output"
+    output_dir: str = "./alpaca-finetuning-lr3e4-epoch3-bs64"
     freeze_layers: bool = False
     num_freeze_layers: int = 1
     quantization: bool = False
