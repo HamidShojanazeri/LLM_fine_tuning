@@ -69,6 +69,7 @@ import torch.distributed as dist
 from transformers.models.t5.modeling_t5 import T5Block
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 
+
 def main(**kwargs):
     # Update the configuration for the training and sharding process
     update_config((train_config, fsdp_config), **kwargs)
@@ -95,7 +96,7 @@ def main(**kwargs):
     model = LlamaForCausalLM.from_pretrained(
         train_config.model_name,
         load_in_8bit=True if train_config.quantization else None,
-        device_map="auto" if train_config.quantization else None,   
+        device_map="auto" if train_config.quantization else None, 
     )
     
     print_model_size(model, train_config, rank if train_config.enable_fsdp else 0)
@@ -235,8 +236,8 @@ def main(**kwargs):
         local_rank if train_config.enable_fsdp else None,
         rank if train_config.enable_fsdp else None,
     )
-    if rank==0:
-        [print(f'Key: {k}, Value: {v}') for k, v in results.items()]
+    
+    [print(f'Key: {k}, Value: {v}') for k, v in results.items()]
 
 if __name__ == "__main__":
     fire.Fire(main)
