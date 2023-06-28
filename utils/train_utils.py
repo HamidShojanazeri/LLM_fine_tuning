@@ -81,7 +81,7 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
             total_loss = 0.0
             data_set_len = 0
             
-            for step, batch in enumerate(tqdm(train_dataloader,colour="blue", desc="Training Epoch{epoch}")):
+            for step, batch in enumerate(tqdm(train_dataloader,colour="blue", desc=f"Training Epoch{epoch}")):
                 for key in batch.keys():
                     if train_config.enable_fsdp:
                         batch[key] = batch[key].to(local_rank)

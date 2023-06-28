@@ -5,7 +5,7 @@ from itertools import chain
 
 
 class Concatenator(object):
-    def __init__(self, chunk_size=128):
+    def __init__(self, chunk_size=2048):
         self.chunk_size=chunk_size
         self.residual = {"input_ids": [], "attention_mask": []}
         

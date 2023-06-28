@@ -154,17 +154,16 @@ def main(**kwargs):
         dataset_config,
         split="train",
     )
-    if train_config.enable_fsdp:
-        if rank == 0:
-            print(f"--> Training Set Length = {len(dataset_train)}")
+    
+    if not train_config.enable_fsdp or rank == 0:
+        print(f"--> Training Set Length = {len(dataset_train)}")
 
     dataset_val = get_preprocessed_dataset(
         tokenizer,
         dataset_config,
         split="test",
     )
-    if train_config.enable_fsdp:
-        if rank == 0:
+    if not train_config.enable_fsdp or rank == 0:
             print(f"--> Validation Set Length = {len(dataset_val)}")
 
     train_sampler = None
@@ -236,8 +235,8 @@ def main(**kwargs):
         local_rank if train_config.enable_fsdp else None,
         rank if train_config.enable_fsdp else None,
     )
-    
-    [print(f'Key: {k}, Value: {v}') for k, v in results.items()]
+    if not train_config.enable_fsdp or rank==0:
+        [print(f'Key: {k}, Value: {v}') for k, v in results.items()]
 
 if __name__ == "__main__":
     fire.Fire(main)
