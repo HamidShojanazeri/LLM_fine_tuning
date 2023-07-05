@@ -17,3 +17,5 @@ To run the benchmarks for Accelerate + int8 quantization:
  python vllm_benchmark.py --model_name "/data/home/mreso/LLM_fine_tuning/models/7B/" --prompt_file prompt_2k.txt  --max_new_tokens 100 --num_iterations 30 --quantization True
 
 ```
+
+You can use different promot/context sizes by using [214 tokens](./prompt_small.txt), [1k](./prompt_1k.txt), [2k](./prompt_2k.txt),[3k](./prompt_3k.txt), [4k](./prompt_4k.txt).
