@@ -80,7 +80,6 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
             model.train()
             total_loss = 0.0
             data_set_len = 0
-            
             for step, batch in enumerate(tqdm(train_dataloader,colour="blue", desc=f"Training Epoch{epoch}")):
                 for key in batch.keys():
                     if train_config.enable_fsdp:
@@ -152,8 +151,8 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                             model, optimizer, rank, train_config, epoch=1
                         )   
                                 
-            best_val_loss = eval_epoch_loss
-            if local_rank == 0 and eval_epoch_loss < best_val_loss:
+            if eval_epoch_loss < best_val_loss:
+                best_val_loss = eval_epoch_loss
                 print(f"best eval loss on epoch {epoch} is {best_val_loss}")
                 val_loss.append(best_val_loss)
                 val_prep.append(eval_ppl)
