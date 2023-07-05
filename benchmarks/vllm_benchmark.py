@@ -41,10 +41,12 @@ def run_benchmark(model_name, prompt_file, max_new_tokens, num_iterations,quanti
         
              
         tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = LlamaForCausalLM.from_pretrained(model_name)
-                                                # load_in_8bit=True if quantization else None,
-                                                # device_map="auto")
+        model = LlamaForCausalLM.from_pretrained(model_name,
+                                                load_in_8bit=True if quantization else None,
+                                                device_map="auto")
         model.to(torch.bfloat16)
+        model.to("cuda:0")
+        
     total_time_per_token = []
  
     for i in range(num_iterations):
