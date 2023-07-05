@@ -44,8 +44,8 @@ def run_benchmark(model_name, prompt_file, max_new_tokens, num_iterations,quanti
         model = LlamaForCausalLM.from_pretrained(model_name,
                                                 load_in_8bit=True if quantization else None,
                                                 device_map="auto")
-        model.to(torch.bfloat16)
-        model.to("cuda:0")
+        #model.to(torch.bfloat16)
+        #model.to("cuda:0")
         
     total_time_per_token = []
  
