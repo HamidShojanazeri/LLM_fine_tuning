@@ -1,3 +1,9 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# This software may be used and distributed according to the terms of the GNU General Public License version 3.
+
+# For dataset details visit: https://huggingface.co/datasets/jfleg
+# For download and preparation see: recipes/ft_datasets/grammar_dataset/grammar_dataset_process.ipynb
+
 import argparse
 import csv
 import glob
@@ -18,104 +24,65 @@ from torch.utils.data import Dataset
 
 from datasets import load_dataset
 from pathlib import Path
+from ft_datasets.utils import ConcatDataset
 
 
 class grammar(Dataset):
     def __init__(
         self,
         tokenizer,
-        type="train",
         csv_name=None,
-        num_samples=None,
-        input_length=512,
-        output_length=512,
-        print_text=False,
     ):
 
-        self.dataset = load_dataset(
-            "csv",
-            data_files={"train": [csv_name]},  # "eval": "grammar_validation.csv"},
-            delimiter=",",
-        )
+        try:
+            self.dataset = load_dataset(
+                "csv",
+                data_files={"train": [csv_name]},  # "eval": "grammar_validation.csv"},
+                delimiter=",",
+            )
+        except Exception as e:
+            print("Loading of grammar dataset failed! Please see recipes/ft_datasets/grammar_dataset/grammar_dataset_process.ipynb for details on how to download the dataset.")
+            raise e
 
         # self.dataset = load_dataset("wikihow", "all", data_dir="data/", split=type_path)
         # if num_samples:
         #    self.dataset = self.dataset.select(list(range(0, num_samples)))
-        self.input_length = input_length
         self.tokenizer = tokenizer
-        self.output_length = output_length
         self.print_text = False  # print_text
 
     def __len__(self):
         return self.dataset["train"].shape[0]
 
     def convert_to_features(self, example_batch):
-        # Tokenize contexts and questions (as pairs of inputs)
-
-        # model_inputs = self.tokenizer(
-        #    example_batch["input"], max_length=512, truncation=True
-        # )
-
-        # Setup the tokenizer for targets
-        # with self.tokenizer.as_target_tokenizer():
-        #    labels = self.tokenizer(
-        #       example_batch["target"], max_length=512, truncation=True
-        #    )
-
-        # model_inputs["labels"] = labels["input_ids"]
-        # print(model_inputs[0])
-        # return model_inputs
+        # Create prompt and tokenize contexts and questions
 
         if self.print_text:
             print("Input Text: ", self.clean_text(example_batch["text"]))
-        #         input_ = self.clean_text(example_batch['text']) + " </s>"
-        #         target_ = self.clean_text(example_batch['headline']) + " </s>"
 
         input_ = example_batch["input"]
         target_ = example_batch["target"]
-
-        source = self.tokenizer.batch_encode_plus(
-            [input_],
-            max_length=self.input_length,
-            padding="max_length",
-            truncation=True,
-            return_tensors="pt",
-        )
-
-        targets = self.tokenizer.batch_encode_plus(
-            [target_],
-            max_length=self.output_length,
-            padding="max_length",
-            truncation=True,
-            return_tensors="pt",
-        )
-
-        return source, targets  # , model_inputs
+        
+        prompt = f"Correct this to standard English: {input_}\n---\nCorrected: {target_}"
+        sample = self.tokenizer(prompt)
+        
+        return sample
 
     def __getitem__(self, index):
-        source, targets = self.convert_to_features(self.dataset["train"][index])
+        sample = self.convert_to_features(self.dataset["train"][index])
+        source_ids = sample["input_ids"]
 
-        source_ids = source["input_ids"].squeeze()
-        target_ids = targets["input_ids"].squeeze()
+        src_mask = sample["attention_mask"]
 
-        src_mask = source["attention_mask"].squeeze()
-        target_mask = targets["attention_mask"].squeeze()
-
-        # return {
-        #     "source_ids": source_ids,
-        #     "source_mask": src_mask,
-        #     "target_ids": target_ids,
-        #     "target_mask": target_mask,
-        # }
         return {
             "input_ids": source_ids,
             "attention_mask": src_mask,
-            "labels": target_ids
+            "labels": source_ids.copy(),
+            
         }
 
 
 def get_dataset(
-    _, tokenizer, csv_name=None, num_samples=None, input_length=512
+    dataset_config, tokenizer, csv_name=None
 ):
     """cover function for handling loading the working dataset"""
     """dataset loading"""
@@ -124,9 +91,9 @@ def get_dataset(
         print(f"Loading dataset {currPath}")
         csv_name = str(currPath)
 
-    return grammar(
+    dataset = grammar(
         tokenizer=tokenizer,
         csv_name=csv_name,
-        num_samples=num_samples,
-        input_length=input_length,
     )
+    
+    return ConcatDataset(dataset, chunk_size=dataset_config.input_length)

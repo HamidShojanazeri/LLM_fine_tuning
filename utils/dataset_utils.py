@@ -18,7 +18,7 @@ from typing import Optional
 DATASET_PREPROC = {
     "alpaca_dataset": partial(get_alpaca_dataset, max_words=224),
     "cnn_dailymail_dataset": get_cnn_dailymail_dataset,
-    "grammar_dataset": partial(get_grammar_dataset, num_samples=512, input_length=512),
+    "grammar_dataset": get_grammar_dataset,
     "samsum_dataset": get_samsum_dataset,
 }
 
