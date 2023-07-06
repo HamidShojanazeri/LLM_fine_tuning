@@ -56,10 +56,8 @@ def run_benchmark(model_name,
 
         if dtype is not None and dtype=="bf16":
             model.to(torch.bfloat16)
-            model.to("cuda:0")  
         elif dtype is not None and dtype=="fp16":
             model.to(torch.float16)
-            model.to("cuda:0")
             
         if BT:                                   
             model = BetterTransformer.transform(model)
@@ -76,6 +74,7 @@ def run_benchmark(model_name,
             else:  
                 inputs = tokenizer(user_prompt, return_tensors="pt")
                 input_ids = inputs["input_ids"].to("cuda:0")
+                model.to("cuda:0") 
                 outputs = model.generate(
                     input_ids,
                     max_new_tokens=max_new_tokens,
