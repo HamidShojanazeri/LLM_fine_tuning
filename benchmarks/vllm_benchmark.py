@@ -52,12 +52,14 @@ def run_benchmark(model_name,
         model = LlamaForCausalLM.from_pretrained(model_name,
                                                 load_in_8bit=True if quantization else None,
                                                 device_map="auto" if quantization else None)
-        print_model_size(model)       
-
-        if dtype is not None and dtype=="bf16":
-            model.to(torch.bfloat16)
-        elif dtype is not None and dtype=="fp16":
-            model.to(torch.float16)
+        print_model_size(model)   
+            
+        if not quantization:
+            if dtype is not None and dtype=="bf16":
+                model.to(torch.bfloat16)
+            elif dtype is not None and dtype=="fp16":
+                model.to(torch.float16)
+            model.to("cuda:0") 
             
         if BT:                                   
             model = BetterTransformer.transform(model)
@@ -74,7 +76,7 @@ def run_benchmark(model_name,
             else:  
                 inputs = tokenizer(user_prompt, return_tensors="pt")
                 input_ids = inputs["input_ids"].to("cuda:0")
-                model.to("cuda:0") 
+        
                 outputs = model.generate(
                     input_ids,
                     max_new_tokens=max_new_tokens,
