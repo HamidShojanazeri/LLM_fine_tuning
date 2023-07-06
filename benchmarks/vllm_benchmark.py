@@ -5,22 +5,28 @@ import time
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, LlamaForCausalLM
 from scipy.stats import gmean
-
+from optimum.bettertransformer import BetterTransformer
+from utils import clear_gpu_cache, print_model_size
 
 from vllm import LLM
 from vllm import LLM, SamplingParams
 import fire
 
 import random
-
-# def generate_random_input_ids(size, vocab_size):
-#     input_ids = [random.randint(0, vocab_size - 1) for _ in range(size)]
-#     return input_ids
+import csv
 
 def byte2gb(x):
     return int(x / 2**30)
 
-def run_benchmark(model_name, prompt_file, max_new_tokens, num_iterations,quantization=True, vLLM=False, tp_size=1):
+def run_benchmark(model_name,
+                  prompt_file,
+                  max_new_tokens,
+                  num_iterations,
+                  quantization=False,
+                  vLLM=False,
+                  tp_size=1,
+                  dtype=None,
+                  BT=False):
     
     if prompt_file is not None:
         assert os.path.exists(prompt_file), f"Provided Prompt file does not exist {prompt_file}"
@@ -32,6 +38,9 @@ def run_benchmark(model_name, prompt_file, max_new_tokens, num_iterations,quanti
         print("No user prompt provided. Exiting.")
         sys.exit(1)
         
+    #clear GPU cache
+    clear_gpu_cache()
+    
     if vLLM:
         print("we are in the vLLM branch")
         model = LLM(model_name, tensor_parallel_size=tp_size)
@@ -39,14 +48,21 @@ def run_benchmark(model_name, prompt_file, max_new_tokens, num_iterations,quanti
     else:
         print("we are in the HF branch")
         
-             
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         model = LlamaForCausalLM.from_pretrained(model_name,
                                                 load_in_8bit=True if quantization else None,
-                                                device_map="auto")
-        model.to(torch.bfloat16)
-        model.to("cuda:0")
-        
+                                                device_map="auto" if quantization else None)
+        print_model_size(model)       
+
+        if dtype is not None and dtype=="bf16":
+            model.to(torch.bfloat16)
+            model.to("cuda:0")  
+        elif dtype is not None and dtype=="fp16":
+            model.to(torch.float16)
+            model.to("cuda:0")
+            
+        if BT:                                   
+            model = BetterTransformer.transform(model)
     total_time_per_token = []
  
     for i in range(num_iterations):
@@ -60,8 +76,6 @@ def run_benchmark(model_name, prompt_file, max_new_tokens, num_iterations,quanti
             else:  
                 inputs = tokenizer(user_prompt, return_tensors="pt")
                 input_ids = inputs["input_ids"].to("cuda:0")
-                print(f"**** input_ids length **** {input_ids.size()}")
-                # model.to("cuda:0")
                 outputs = model.generate(
                     input_ids,
                     max_new_tokens=max_new_tokens,
@@ -86,6 +100,30 @@ def run_benchmark(model_name, prompt_file, max_new_tokens, num_iterations,quanti
         print("Generated text:", generated_text)
     print("Geometric mean time per token: {:.8f} ms".format(geometric_mean))
     print("The mean time per token: {:.8f} ms".format(mean))
+    results = {
+        'model_name': model_name,
+        'prompt_file_name': prompt_file,
+        'max_new_tokens': max_new_tokens,
+        'num_iterations': num_iterations,
+        'datatype': dtype,
+        'BT': BT,
+        'mean_time_per_token': mean,
+        'geometric_mean_time_per_token': geometric_mean,
+        'vLLM':vLLM,
+        'quantization':quantization
+    }
+
+      # Save the results to a CSV file
+    fields = list(results.keys())
+    file_exists = os.path.exists('results.csv')
+
+    with open('results.csv', 'a', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=fields)
+
+        if not file_exists:
+            writer.writeheader()
+
+        writer.writerow(results)
 
 
 if __name__ == "__main__":
