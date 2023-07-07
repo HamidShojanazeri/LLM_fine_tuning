@@ -34,7 +34,7 @@ def main(
     early_stopping: bool=False, #Controls the stopping condition for beam-based methods, like beam-search
     num_beams: int=1, #Number of beams for beam search
     penalty_alpha: float=None, #[optional] The values balance the model confidence and the degeneration penalty in contrastive search decoding.
-    use_cache: bool=True,  #[optional] Whether or not the model should use the past last key/values attentions
+    use_cache: bool=True,  #[optional] Whether or not the model should use the past last key/values attentions Whether or not the model should use the past last key/values attentions (if applicable to the model) to speed up decoding.
     top_p: float=0.9, # [optional] If set to float < 1, only the smallest set of most probable tokens with probabilities that add up to top_p or higher are kept for generation.
     temperature: float=0.6, # [optional] The value used to modulate the next token probabilities.
     top_k: int=50, # [optional] The number of highest probability vocabulary tokens to keep for top-k-filtering.
