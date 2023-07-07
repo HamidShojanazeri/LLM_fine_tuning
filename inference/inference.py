@@ -20,7 +20,6 @@ def perform_safety_check(text, score_threshold, name):
         print(f"{name} failed safety check. Exiting")
         sys.exit(0)
 
-
 def main(
     model_name,
     peft_model: str=None,
@@ -95,6 +94,7 @@ def main(
     batch = tokenizer(user_prompt, return_tensors="pt")
 
     with torch.no_grad():
+        # reference for generate args, https://huggingface.co/docs/transformers/main_classes/text_generation 
         outputs = model.generate(**batch,
                                  max_new_tokens=max_new_tokens,
                                  do_sample=do_sample,
