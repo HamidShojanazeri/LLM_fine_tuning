@@ -61,7 +61,9 @@ sbatch multi_node.slurm
 Depending on the type of fine tuning performed during training the [inference script](inference.py) takes different arguements.
 For a fine tuning of all model parameters the output dir of the training has to be given as --model_name argument.
 In case a parameter efficient method like lora the base model has to be given as --model_name and the output dir of the training has to be given as --peft_model argument.
-Additionally, a prompt for the model in form of a text file has to be provided. The prompt file can either be piped through standard input or given as --prompt_file parameter.
+Additionally, a prompt for the model in form of a text file has to be provided. The prompt file can either be piped through standard input or given as --prompt_file parameter. 
+
+**Note** to pass more advanced args for generate function in the inference script please check the args in the [generate function](./inference/inference.py) or alternatively check [HuggingFace document](https://huggingface.co/docs/transformers/main_classes/text_generation).
 
 Examples:
  ```bash
