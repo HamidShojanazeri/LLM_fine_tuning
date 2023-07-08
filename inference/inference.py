@@ -1,40 +1,52 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # This software may be used and distributed according to the terms of the GNU General Public License version 3.
 
-from accelerate import init_empty_weights, load_checkpoint_and_dispatch
+# from accelerate import init_empty_weights, load_checkpoint_and_dispatch
 import fire
-import torch
+# import torch
 import os
 import sys
 import warnings
 from typing import List
 
-from peft import PeftModel, PeftConfig
+# from peft import PeftModel, PeftConfig
 from transformers import LlamaConfig, LlamaTokenizer, LlamaForCausalLM
 
 
 class AuditNLGSafetyChecker(object):
-    def __init__(self, tokenizer):
+    def __init__(self, tokenizer, method):
         self.tokenizer = tokenizer
+        self.method = method
 
     def __call__(self, output_text):
         from auditnlg.safety.exam import safety_scores
 
-        data = data = [{"output": output_text}]
+        data = [{"output": output_text}]
 
-        if self.get_total_length(data) > 512:
-            warnings.warn(
-                "Input length is > 512 token. Safety check result could be incorrect."
-            )
-
-        result = safety_scores(data=data, method="Salesforce/safety-flan-t5-small")
-        scores = result[1]["aspect_explanation"][0]
-        is_safe = len(scores) == 0
-        report = ""
-        if not is_safe:
-            report = "|" + "|".join(f"{n:^10}" for n in scores.keys()) + "|\n"
-            report += "|" + "|".join(f"{n:^10}" for n in scores.values()) + "|\n"
-        return is_safe, report
+        if self.method == "sensitive_topics":
+            result = safety_scores(data=data, method=self.method)
+            scores = result[1]["all_scores"][0]
+            is_safe = scores["pred_class"] == "none"
+            report = ""
+            if not is_safe:
+                report += f"Predicted class: {scores['pred_class']}\n"
+                report += "|" + "|".join(f"{n:^10}" for n in [list(k.keys())[0] for k in scores["class_scores"]]) + "|\n"
+                report += "|" + "|".join(f"{n:^10.5}" for n in [list(k.values())[0] for k in scores["class_scores"]]) + "|\n"
+            return is_safe, report
+        else:
+            if self.get_total_length(data) > 512:
+                warnings.warn(
+                    "Input length is > 512 token. Safety check result could be incorrect."
+                )
+            result = safety_scores(data=data, method=self.method)
+            scores = result[1]["aspect_explanation"][0]
+            is_safe = len(scores) == 0
+            report = ""
+            if not is_safe:
+                report += "|" + "|".join(f"{n:^10}" for n in scores.keys()) + "|\n"
+                report += "|" + "|".join(f"{n:^10}" for n in scores.values()) + "|\n"
+            return is_safe, report
+        
 
     def get_total_length(self, data):
         prefix = "Is the <Text> field safe or unsafe "
@@ -143,6 +155,7 @@ def main(
     ] = None,  # [optional] A list of tokens that will be suppressed at the beginning of the generation.
     length_penalty: int = 1,  # [optional] Exponential penalty to the length that is used with beam-based generation.
     use_azure_contentsafety: bool = False,
+    use_sensitive_topics: bool = False,
 ):
     if prompt_file is not None:
         assert os.path.exists(
@@ -157,15 +170,15 @@ def main(
         sys.exit(1)
 
     print(f"User prompt:\n{user_prompt}")
-    # Set the seeds for reproducibility
-    torch.cuda.manual_seed(seed)
-    torch.manual_seed(seed)
-    model = LlamaForCausalLM.from_pretrained(
-        model_name,
-        return_dict=True,
-        load_in_8bit=quantization,
-        device_map="auto",
-    )
+    # # Set the seeds for reproducibility
+    # torch.cuda.manual_seed(seed)
+    # torch.manual_seed(seed)
+    # model = LlamaForCausalLM.from_pretrained(
+    #     model_name,
+    #     return_dict=True,
+    #     load_in_8bit=quantization,
+    #     device_map="auto",
+    # )
 
     tokenizer = LlamaTokenizer.from_pretrained(model_name)
     tokenizer.add_special_tokens(
@@ -178,44 +191,48 @@ def main(
     )
     if use_azure_contentsafety:
         perform_safety_check = AzureSaftyChecker()
+    elif use_sensitive_topics:    
+        perform_safety_check = AuditNLGSafetyChecker(tokenizer, "sensitive_topics")
     else:
-        perform_safety_check = AuditNLGSafetyChecker(tokenizer)
+        perform_safety_check = AuditNLGSafetyChecker(tokenizer, "Salesforce/safety-flan-t5-small")
 
-    if peft_model:
-        # Load the Lora model
-        model = PeftModel.from_pretrained(model, peft_model)
+    # if peft_model:
+    #     # Load the Lora model
+    #     model = PeftModel.from_pretrained(model, peft_model)
 
-    model.eval()
+    # model.eval()
 
-    batch = tokenizer(user_prompt, return_tensors="pt")
+    # batch = tokenizer(user_prompt, return_tensors="pt")
 
-    with torch.no_grad():
-        # reference for generate args, https://huggingface.co/docs/transformers/main_classes/text_generation
-        outputs = model.generate(
-            **batch,
-            max_new_tokens=max_new_tokens,
-            do_sample=do_sample,
-            top_p=top_p,
-            temperature=temperature,
-            max_length=max_length,
-            min_length=min_length,
-            early_stopping=early_stopping,
-            num_beams=num_beams,
-            penalty_alpha=penalty_alpha,
-            use_cache=use_cache,
-            top_k=top_k,
-            epsilon_cutoff=epsilon_cutoff,
-            diversity_penalty=diversity_penalty,
-            repetition_penalty=repetition_penalty,
-            no_repeat_ngram_size=no_repeat_ngram_size,
-            remove_invalid_values=remove_invalid_values,
-            bad_words_ids=bad_words_ids,
-            suppress_tokens=suppress_tokens,
-            begin_suppress_tokens=begin_suppress_tokens,
-            length_penalty=length_penalty,
-        )
+    # with torch.no_grad():
+    #     # reference for generate args, https://huggingface.co/docs/transformers/main_classes/text_generation
+    #     outputs = model.generate(
+    #         **batch,
+    #         max_new_tokens=max_new_tokens,
+    #         do_sample=do_sample,
+    #         top_p=top_p,
+    #         temperature=temperature,
+    #         max_length=max_length,
+    #         min_length=min_length,
+    #         early_stopping=early_stopping,
+    #         num_beams=num_beams,
+    #         penalty_alpha=penalty_alpha,
+    #         use_cache=use_cache,
+    #         top_k=top_k,
+    #         epsilon_cutoff=epsilon_cutoff,
+    #         diversity_penalty=diversity_penalty,
+    #         repetition_penalty=repetition_penalty,
+    #         no_repeat_ngram_size=no_repeat_ngram_size,
+    #         remove_invalid_values=remove_invalid_values,
+    #         bad_words_ids=bad_words_ids,
+    #         suppress_tokens=suppress_tokens,
+    #         begin_suppress_tokens=begin_suppress_tokens,
+    #         length_penalty=length_penalty,
+    #     )
 
-    output_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    # output_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    
+    output_text = "This text is here to tell you how good drugs are!"
 
     is_safe, report = perform_safety_check(output_text)
     if is_safe:
