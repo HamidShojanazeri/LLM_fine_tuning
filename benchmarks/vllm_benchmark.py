@@ -7,6 +7,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, LlamaForCausalLM
 from scipy.stats import gmean
 from optimum.bettertransformer import BetterTransformer
 from utils import clear_gpu_cache, print_model_size
+from accelerate import Accelerator
 
 from vllm import LLM
 from vllm import LLM, SamplingParams
@@ -15,9 +16,11 @@ import fire
 import random
 import csv
 
+# Function to convert bytes to gigabytes
 def byte2gb(x):
     return int(x / 2**30)
 
+# Main function to run the benchmark
 def run_benchmark(model_name,
                   prompt_file,
                   max_new_tokens,
@@ -26,40 +29,54 @@ def run_benchmark(model_name,
                   vLLM=False,
                   tp_size=1,
                   dtype=None,
-                  BT=False):
+                  BT=False,
+                  profile=False,
+                  batch_size=1):
     
+    # Check if a prompt file is provided and read from it
     if prompt_file is not None:
         assert os.path.exists(prompt_file), f"Provided Prompt file does not exist {prompt_file}"
         with open(prompt_file, "r") as f:
             user_prompt = '\n'.join(f.readlines())
+    # If no prompt file, read from stdin
     elif not sys.stdin.isatty():
         user_prompt = '\n'.join(sys.stdin.readlines())
     else:
+        # If no input is provided, exit the program
         print("No user prompt provided. Exiting.")
         sys.exit(1)
         
     #clear GPU cache
     clear_gpu_cache()
     
+    # If vLLM is True, use LLM model
     if vLLM:
         print("we are in the vLLM branch")
         model = LLM(model_name, tensor_parallel_size=tp_size)
         sampling_param = SamplingParams(top_p=0.9, temperature=0.7, max_tokens=max_new_tokens)
     else:
+        # If vLLM is False, use AutoTokenizer and LlamaForCausalLM
         print("we are in the HF branch")
         
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         model = LlamaForCausalLM.from_pretrained(model_name,
                                                 load_in_8bit=True if quantization else None,
-                                                device_map="auto" if quantization else None)
-        print_model_size(model)   
+                                                device_map="auto",
+                                                low_cpu_mem_usage=True)
+                                                # revision="main",
+                                                # offload_folder="offload",
+                                                # offload_state_dict=True,
+                                                # torch_dtype=torch.float16)
+        
+        # print_model_size(model)   
             
         if not quantization:
             if dtype is not None and dtype=="bf16":
                 model.to(torch.bfloat16)
             elif dtype is not None and dtype=="fp16":
                 model.to(torch.float16)
-            model.to("cuda:0") 
+            if torch.cuda.device_count() < 2:
+                model.to("cuda:0") 
             
         if BT:                                   
             model = BetterTransformer.transform(model)
@@ -70,21 +87,28 @@ def run_benchmark(model_name,
        
 
         with torch.no_grad():
+            if profile:
+                torch.cuda.cudart().cudaProfilerStart()
             start_time = time.perf_counter()
             if vLLM:
-                outputs = model.generate(user_prompt,sampling_params=sampling_param )
+                prompt_list = [user_prompt for _ in range(batch_size)]
+                print("prompt list len *********", len(prompt_list))
+                outputs = model.generate(prompt_list,sampling_params=sampling_param )
             else:  
                 inputs = tokenizer(user_prompt, return_tensors="pt")
                 input_ids = inputs["input_ids"].to("cuda:0")
-        
+                batch_input_ids = input_ids.expand(batch_size, -1) 
+                print("******* batch size is batch_input_ids", batch_input_ids.size())
                 outputs = model.generate(
-                    input_ids,
+                    batch_input_ids,
                     max_new_tokens=max_new_tokens,
                     do_sample=True,
                     top_p=0.9,
                     temperature=0.7,
                 )
             end_time = time.perf_counter()
+            if profile:
+                torch.cuda.cudart().cudaProfilerStop()
         print(f"memoy allocated {byte2gb(torch.cuda.memory_allocated())} GB after inference")
         print(f"max memory reseved {byte2gb(torch.cuda.max_memory_reserved())} GB after inference")
         inference_time = (end_time - start_time)*1000
@@ -108,6 +132,7 @@ def run_benchmark(model_name,
         'num_iterations': num_iterations,
         'datatype': dtype,
         'BT': BT,
+        'batch_size':batch_size,
         'mean_time_per_token': mean,
         'geometric_mean_time_per_token': geometric_mean,
         'vLLM':vLLM,
