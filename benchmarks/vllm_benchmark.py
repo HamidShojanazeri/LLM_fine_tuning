@@ -75,8 +75,8 @@ def run_benchmark(model_name,
                 model.to(torch.bfloat16)
             elif dtype is not None and dtype=="fp16":
                 model.to(torch.float16)
-            if torch.cuda.device_count() < 2:
-                model.to("cuda:0") 
+            
+            model.to("cuda:0") 
             
         if BT:                                   
             model = BetterTransformer.transform(model)
@@ -105,6 +105,7 @@ def run_benchmark(model_name,
                     do_sample=True,
                     top_p=0.9,
                     temperature=0.7,
+                    use_cache=True,
                 )
             end_time = time.perf_counter()
             if profile:
